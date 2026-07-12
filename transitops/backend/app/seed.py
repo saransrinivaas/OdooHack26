@@ -123,11 +123,12 @@ def seed():
             ("Zara Sheikh",   "TN07 20220001111", "LMV",         10, "9200011122", 73, DriverStatus.AVAILABLE),   # expiring soon
         ]
         drivers = []
-        for name, lic, cat, exp_offset, contact, score, status in drivers_data:
+        for i, (name, lic, cat, exp_offset, contact, score, status) in enumerate(drivers_data):
+            email = "driver@transitops.com" if i == 0 else REMINDER_EMAIL
             d = Driver(
                 name=name, license_number=lic, license_category=cat,
                 license_expiry=_today() + timedelta(days=exp_offset),
-                contact_number=contact, email=REMINDER_EMAIL,
+                contact_number=contact, email=email,
                 safety_score=score, status=status,
             )
             db.add(d)
