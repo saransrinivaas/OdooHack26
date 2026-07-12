@@ -42,6 +42,17 @@ def create_expense(body: ExpenseCreate, db: Session = Depends(get_db), _: User =
         amount=body.amount, description=body.description, notes=body.notes,
         expense_date=body.expense_date or date.today(),
     )
+    
+    # Anomaly Detection
+    import math
+    recent = db.query(Expense).filter(Expense.category == body.category).order_by(Expense.id.desc()).limit(20).all()
+    if len(recent) >= 5:
+        mean = sum(r.amount for r in recent) / len(recent)
+        variance = sum((r.amount - mean) ** 2 for r in recent) / len(recent)
+        std_dev = math.sqrt(variance)
+        if std_dev > 0 and body.amount > (mean + 2 * std_dev):
+            e.is_anomalous = True
+            
     db.add(e)
     db.commit()
     db.refresh(e)

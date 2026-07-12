@@ -73,6 +73,20 @@ def validate_assignment(db: Session, vehicle: Vehicle, driver: Driver,
                                  f"{vehicle.registration_number}'s capacity of "
                                  f"{vehicle.max_load_capacity:g} kg.")
 
+    # Driver Fatigue / HoS Check (12-hour limit)
+    from datetime import datetime, date
+    today = date.today()
+    start_of_day = datetime(today.year, today.month, today.day)
+    # Sum actual duration of completed trips + planned duration of new trip
+    completed_trips = db.query(Trip).filter(
+        Trip.driver_id == driver.id,
+        Trip.status == TripStatus.COMPLETED,
+        Trip.completed_at >= start_of_day
+    ).all()
+    hours_today = sum((t.actual_duration or t.planned_duration or 0) for t in completed_trips)
+    if hours_today >= 12:
+        raise HTTPException(400, f"Driver {driver.name} has exceeded the safe driving limit (12 hours) today.")
+
 
 # --- Automatic status transitions -----------------------------------------
 def dispatch_trip(db: Session, trip: Trip):

@@ -1,8 +1,9 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_roles
+from ..config import UPLOAD_DIR
 from ..database import get_db
 from ..models import Trip, Vehicle, Driver, TripStatus, Role, User
 from ..schemas import TripCreate, TripComplete, TripOut, TripRevenue, TripSuggestRequest, TripUpdate
@@ -164,6 +165,28 @@ def complete(trip_id: int, body: TripComplete, db: Session = Depends(get_db),
     db.refresh(t)
     return _out(db, t)
 
+
+@router.post("/{trip_id}/pod", response_model=TripOut)
+def upload_pod(
+    trip_id: int, 
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    _: User = Depends(complete_trips)
+):
+    import uuid
+    import shutil
+    t = db.query(Trip).get(trip_id)
+    if not t:
+        raise HTTPException(404, "Trip not found.")
+    
+    stored = UPLOAD_DIR / f"pod_{uuid.uuid4().hex}_{file.filename}"
+    with stored.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+        
+    t.pod_image_path = str(stored)
+    db.commit()
+    db.refresh(t)
+    return _out(db, t)
 
 @router.post("/{trip_id}/cancel", response_model=TripOut)
 def cancel(trip_id: int, db: Session = Depends(get_db), _: User = Depends(own_trips)):

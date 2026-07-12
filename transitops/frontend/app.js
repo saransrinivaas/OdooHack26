@@ -1691,7 +1691,12 @@ window.renderDriverTripExecution = async function(tripId) {
               <label class="form-label">Fuel Consumed (Liters)</label>
               <input id="c-fuel" type="number" class="form-control" required min="1">
             </div>
-            <button type="submit" class="btn btn-primary btn-full mt-2">Log Completion</button>
+            <div class="form-group">
+              <label class="form-label">E-POD (Proof of Delivery)</label>
+              <input type="file" id="c-pod-file" class="form-control" accept="image/*">
+              <div class="text-sm text-muted mt-1">Upload a photo of delivery receipt or signature.</div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full mt-2" id="c-submit-btn">Log Completion</button>
           </form>
         </div>
       </div>
@@ -1701,14 +1706,35 @@ window.renderDriverTripExecution = async function(tripId) {
       e.preventDefault();
       const finalOdo = parseFloat(document.getElementById("c-final-odo").value);
       const fuel = parseFloat(document.getElementById("c-fuel").value);
+      const podFile = document.getElementById("c-pod-file").files[0];
+      const btn = document.getElementById("c-submit-btn");
       
-      await request(`/api/trips/${trip.id}/complete`, {
-        method: "POST",
-        body: JSON.stringify({ final_odometer: finalOdo, fuel_consumed: fuel })
-      });
-      showToast("Trip completed. Drive Safe!");
-      state.currentPage = "driver_trips";
-      renderPage();
+      btn.disabled = true;
+      btn.textContent = "Submitting...";
+      
+      try {
+        await request(`/api/trips/${trip.id}/complete`, {
+          method: "POST",
+          body: JSON.stringify({ final_odometer: finalOdo, fuel_consumed: fuel })
+        });
+        
+        if (podFile) {
+          const fd = new FormData();
+          fd.append("file", podFile);
+          await fetch(`/api/trips/${trip.id}/pod`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${state.token}` },
+            body: fd
+          });
+        }
+        
+        showToast("Trip completed. Drive Safe!");
+        state.currentPage = "driver_trips";
+        renderPage();
+      } catch(e) {
+        btn.disabled = false;
+        btn.textContent = "Log Completion";
+      }
     });
   } catch(e) {}
 };
@@ -2512,21 +2538,27 @@ async function renderFinanceExpenses(host) {
       const fTbody = document.getElementById("fuel-list-tbody");
       
       eTbody.innerHTML = expenses.map(e => `
-        <tr>
-          <td><span class="fw-600">${e.vehicle_name || 'N/A'}</span></td>
+        <tr style="${e.is_anomalous ? 'background-color: var(--c-red-light);' : ''}">
+          <td>
+            <span class="fw-600">${e.vehicle_name || 'N/A'}</span>
+            ${e.is_anomalous ? '<span class="badge badge-red" style="margin-left: 8px;">Anomaly Flagged</span>' : ''}
+          </td>
           <td><span class="badge badge-blue">${e.category}</span></td>
-          <td><span class="fw-600">₹${e.amount.toLocaleString()}</span></td>
+          <td><span class="fw-600" style="${e.is_anomalous ? 'color: var(--c-red);' : ''}">₹${e.amount.toLocaleString()}</span></td>
           <td>${e.description}</td>
           <td>${e.expense_date}</td>
         </tr>
       `).join("") || `<tr><td colspan="5" style="text-align:center" class="text-muted">No expenses recorded.</td></tr>`;
       
       fTbody.innerHTML = fuel.map(f => `
-        <tr>
-          <td><span class="fw-600">${f.vehicle_name}</span></td>
+        <tr style="${f.is_anomalous ? 'background-color: var(--c-red-light);' : ''}">
+          <td>
+            <span class="fw-600">${f.vehicle_name}</span>
+            ${f.is_anomalous ? '<span class="badge badge-red" style="margin-left: 8px;">Anomaly Flagged</span>' : ''}
+          </td>
           <td>${f.liters} L</td>
           <td>${f.odometer || 'N/A'} km</td>
-          <td><span class="fw-600">₹${f.cost.toLocaleString()}</span></td>
+          <td><span class="fw-600" style="${f.is_anomalous ? 'color: var(--c-red);' : ''}">₹${f.cost.toLocaleString()}</span></td>
           <td>${f.log_date}</td>
         </tr>
       `).join("") || `<tr><td colspan="5" style="text-align:center" class="text-muted">No fuel logs found.</td></tr>`;

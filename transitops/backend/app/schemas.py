@@ -181,6 +181,7 @@ class TripOut(BaseModel):
     fuel_consumed: Optional[float] = None
     revenue: float
     status: str
+    pod_image_path: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -233,6 +234,7 @@ class FuelOut(BaseModel):
     cost: float
     odometer: Optional[float] = None
     log_date: Optional[date] = None
+    is_anomalous: bool = False
 
     class Config:
         from_attributes = True
@@ -259,6 +261,7 @@ class ExpenseOut(BaseModel):
     description: str
     notes: str = ""
     expense_date: Optional[date] = None
+    is_anomalous: bool = False
 
     class Config:
         from_attributes = True

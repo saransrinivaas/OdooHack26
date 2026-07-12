@@ -44,6 +44,7 @@ def due_drivers(db, window: int = REMINDER_WINDOW_DAYS):
                 "driver_id": d.id,
                 "name": d.name,
                 "email": d.email,
+                "phone": d.contact_number,
                 "license_no": d.license_number,
                 "expiry_date": d.license_expiry.isoformat(),
                 "days_left": days,
@@ -74,9 +75,14 @@ def send_reminders(db, window: int = REMINDER_WINDOW_DAYS):
         subject, body = license_reminder.build_message(record, today)
         try:
             license_reminder.send_email(row["email"], subject, body)
-            results.append({**row, "status": "sent"})
+            results.append({**row, "status": "sent", "sms_fallback": False})
         except Exception as e:
-            results.append({**row, "status": "failed", "reason": str(e)})
+            # Fallback to Mock SMS/WhatsApp Provider
+            if row.get("phone"):
+                print(f"[MOCK SMS] To: {row['phone']} - Msg: {subject}")
+                results.append({**row, "status": "sent_via_sms", "reason": str(e), "sms_fallback": True})
+            else:
+                results.append({**row, "status": "failed", "reason": str(e)})
 
     sent = sum(1 for r in results if r["status"] == "sent")
     return {"error": None, "sent": sent, "total": len(results), "results": results}

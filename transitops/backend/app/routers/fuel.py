@@ -40,6 +40,17 @@ def create_fuel(body: FuelCreate, db: Session = Depends(get_db), _: User = Depen
         vehicle_id=body.vehicle_id, trip_id=body.trip_id, liters=body.liters,
         cost=body.cost, odometer=body.odometer, log_date=body.log_date or date.today(),
     )
+    
+    # Anomaly Detection for Fuel Cost
+    import math
+    recent = db.query(FuelLog).filter(FuelLog.vehicle_id == body.vehicle_id).order_by(FuelLog.id.desc()).limit(20).all()
+    if len(recent) >= 5:
+        mean = sum(r.cost for r in recent) / len(recent)
+        variance = sum((r.cost - mean) ** 2 for r in recent) / len(recent)
+        std_dev = math.sqrt(variance)
+        if std_dev > 0 and body.cost > (mean + 2 * std_dev):
+            f.is_anomalous = True
+            
     db.add(f)
     db.commit()
     db.refresh(f)

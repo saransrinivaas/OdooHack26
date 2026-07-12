@@ -150,6 +150,7 @@ class Trip(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     dispatched_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+    pod_image_path = Column(String, nullable=True)     # E-POD uploaded image path
 
     vehicle = relationship("Vehicle", back_populates="trips")
     driver = relationship("Driver", back_populates="trips")
@@ -181,6 +182,7 @@ class FuelLog(Base):
     cost = Column(Float, default=0)
     odometer = Column(Float, nullable=True)
     log_date = Column(Date, default=date.today)
+    is_anomalous = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     vehicle = relationship("Vehicle", back_populates="fuel_logs")
@@ -196,6 +198,7 @@ class Expense(Base):
     description = Column(String, default="")
     notes = Column(String, default="")
     expense_date = Column(Date, default=date.today)
+    is_anomalous = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     vehicle = relationship("Vehicle", back_populates="expenses")
