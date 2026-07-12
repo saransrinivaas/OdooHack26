@@ -896,11 +896,8 @@ async function showNewTripModal(callback) {
             <input id="t-duration" type="number" step="0.1" class="form-control" value="3.5" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Suggested Revenue (₹)</label>
-            <div style="display:flex; gap:6px">
-              <input id="t-revenue" type="number" class="form-control" required>
-              <button type="button" class="btn btn-secondary btn-sm" id="btn-calc-rev">Suggest</button>
-            </div>
+            <label class="form-label">Revenue (₹)</label>
+            <input id="t-revenue" type="number" class="form-control" required>
           </div>
         </div>
         
@@ -935,18 +932,7 @@ async function showNewTripModal(callback) {
     
     showModal("Create New Dispatch", bodyHtml, footerHtml);
     
-    // Revenue suggestion action
-    document.getElementById("btn-calc-rev").addEventListener("click", async () => {
-      const dist = document.getElementById("t-distance").value;
-      const cargo = document.getElementById("t-cargo").value;
-      if (!dist || !cargo) {
-        showToast("Please enter cargo weight and distance first.", "error");
-        return;
-      }
-      const data = await request(`/api/reports/suggest-revenue?distance=${dist}&cargo=${cargo}`);
-      document.getElementById("t-revenue").value = data.suggested_revenue;
-      showToast("Dynamic revenue computed!");
-    });
+    
     
     // Smart suggestion action
     document.getElementById("btn-smart-suggest").addEventListener("click", async () => {
