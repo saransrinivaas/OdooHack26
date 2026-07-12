@@ -42,7 +42,7 @@ def dispatchable_drivers(db: Session):
 
 # --- Validation used at trip creation / dispatch --------------------------
 def validate_assignment(db: Session, vehicle: Vehicle, driver: Driver,
-                        cargo_weight: float):
+                        cargo_weight: float, planned_duration: float = 0.0):
     """Raise HTTP 400 if any mandatory rule is violated."""
     if vehicle is None:
         raise HTTPException(400, "Vehicle not found.")
@@ -84,8 +84,8 @@ def validate_assignment(db: Session, vehicle: Vehicle, driver: Driver,
         Trip.completed_at >= start_of_day
     ).all()
     hours_today = sum((t.actual_duration or t.planned_duration or 0) for t in completed_trips)
-    if hours_today >= 12:
-        raise HTTPException(400, f"Driver {driver.name} has exceeded the safe driving limit (12 hours) today.")
+    if hours_today + planned_duration > 12:
+        raise HTTPException(400, f"Driver {driver.name} has exceeded or will exceed the safe driving limit (12 hours) today (Already driven: {hours_today} hrs, New trip: {planned_duration} hrs).")
 
 
 # --- Automatic status transitions -----------------------------------------
@@ -95,7 +95,7 @@ def dispatch_trip(db: Session, trip: Trip):
         raise HTTPException(400, f"Only Draft trips can be dispatched (this one is {trip.status}).")
     vehicle = db.query(Vehicle).get(trip.vehicle_id)
     driver = db.query(Driver).get(trip.driver_id)
-    validate_assignment(db, vehicle, driver, trip.cargo_weight)
+    validate_assignment(db, vehicle, driver, trip.cargo_weight, trip.planned_duration or 0.0)
 
     from datetime import datetime
     trip.status = TripStatus.DISPATCHED

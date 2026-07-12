@@ -113,11 +113,11 @@ def seed():
         # ------------------------------------------------------------------
         drivers_data = [
             # (name, lic_num, category, expiry_offset_days, contact, score, status)
-            ("Alex Kumar",    "TN02 20240006663", "LMV, MCWG",  400, "9876543210", 92, DriverStatus.AVAILABLE),
+            ("Dan Driver",    "TN02 20240006663", "LMV, MCWG",  400, "9876543210", 92, DriverStatus.ON_TRIP),
             ("Priya Nair",    "KA05 20220005678", "LMV, HMV",    20, "9811122233", 78, DriverStatus.AVAILABLE),
             ("Ravi Singh",    "MH12 20190009999", "HMV",        -15, "9700011122", 65, DriverStatus.AVAILABLE),   # expired
             ("Mohan Das",     "DL08 20210004444", "LMV, HGMV",  300, "9600055566", 40, DriverStatus.SUSPENDED),
-            ("Suresh Babu",   "GJ09 20230007777", "LMV",        180, "9500044455", 88, DriverStatus.ON_TRIP),
+            ("Suresh Babu",   "GJ09 20230007777", "LMV",        180, "9500044455", 88, DriverStatus.AVAILABLE),
             ("Kavitha Raj",   "AP22 20210003333", "LMV, HMV",    90, "9400033344", 81, DriverStatus.AVAILABLE),
             ("Deepak Mehta",  "RJ14 20180008888", "HMV, HGMV",  500, "9300022233", 95, DriverStatus.AVAILABLE),
             ("Zara Sheikh",   "TN07 20220001111", "LMV",         10, "9200011122", 73, DriverStatus.AVAILABLE),   # expiring soon
@@ -175,22 +175,22 @@ def seed():
             make_trip("Chennai",   "Bangalore",  "MH12CD5678", "Priya Nair",   6000, 350, 6.0,  42000, TripStatus.COMPLETED, days_ago=30, adist=360, adur=6.5, s_odo=88000, f_odo=88360, fuel=95),
             make_trip("Mumbai",    "Pune",       "GJ09IJ7890", "Deepak Mehta", 5000, 160, 3.0,  22000, TripStatus.COMPLETED, days_ago=25, adist=162, adur=3.2, s_odo=66000, f_odo=66162, fuel=55),
             make_trip("Delhi",     "Jaipur",     "RJ14KL2345", "Suresh Babu",   800, 285, 5.0,  15000, TripStatus.COMPLETED, days_ago=20, adist=290, adur=5.5, s_odo=31000, f_odo=31290, fuel=78),
-            make_trip("Hyderabad", "Chennai",    "TN01AB1234", "Alex Kumar",    400, 625, 10.0, 28000, TripStatus.COMPLETED, days_ago=18, adist=630, adur=10.5,s_odo=13000, f_odo=13630, fuel=102),
+            make_trip("Hyderabad", "Chennai",    "TN01AB1234", "Dan Driver",    400, 625, 10.0, 28000, TripStatus.COMPLETED, days_ago=18, adist=630, adur=10.5,s_odo=13000, f_odo=13630, fuel=102),
             make_trip("Chennai",   "Coimbatore", "KA05EF9012", "Kavitha Raj",   300, 500, 8.0,  21000, TripStatus.COMPLETED, days_ago=15, adist=502, adur=8.0, s_odo=42500, f_odo=43002, fuel=60),
             make_trip("Kolkata",   "Patna",      "MH12CD5678", "Priya Nair",   8000, 560, 9.0,  55000, TripStatus.COMPLETED, days_ago=12, adist=570, adur=9.5, s_odo=88360, f_odo=88930, fuel=140),
-            make_trip("Bangalore", "Mysore",     "TN01AB1234", "Alex Kumar",    350, 145, 3.0,   9500, TripStatus.COMPLETED, days_ago=10, adist=147, adur=3.1, s_odo=13630, f_odo=13777, fuel=38),
+            make_trip("Bangalore", "Mysore",     "TN01AB1234", "Dan Driver",    350, 145, 3.0,   9500, TripStatus.COMPLETED, days_ago=10, adist=147, adur=3.1, s_odo=13630, f_odo=13777, fuel=38),
             make_trip("Mumbai",    "Nagpur",     "GJ09IJ7890", "Deepak Mehta", 7000, 820, 13.0, 68000, TripStatus.COMPLETED, days_ago=7,  adist=830, adur=13.5,s_odo=66162, f_odo=66992, fuel=210),
             make_trip("Delhi",     "Chandigarh", "AP28MN6789", "Zara Sheikh",   300, 250, 4.5,  13000, TripStatus.COMPLETED, days_ago=5,  adist=252, adur=4.8, s_odo=87000, f_odo=87252, fuel=62),
             make_trip("Chennai",   "Madurai",    "KA05EF9012", "Kavitha Raj",   350, 460, 8.0,  18000, TripStatus.COMPLETED, days_ago=3,  adist=465, adur=8.5, s_odo=43002, f_odo=43467, fuel=72),
 
             # Cancelled
-            make_trip("Mumbai", "Ahmedabad", "TN01AB1234", "Alex Kumar", 450, 530, 9.0, 25000, TripStatus.CANCELLED, days_ago=22),
+            make_trip("Mumbai", "Ahmedabad", "TN01AB1234", "Dan Driver", 450, 530, 9.0, 25000, TripStatus.CANCELLED, days_ago=22),
 
             # Dispatched (currently active)
-            make_trip("Delhi",  "Lucknow",  "RJ14KL2345", "Suresh Babu", 900, 560, 8.5, 32000, TripStatus.DISPATCHED, days_ago=0),
+            make_trip("Delhi",  "Lucknow",  "RJ14KL2345", "Dan Driver", 900, 560, 8.5, 32000, TripStatus.DISPATCHED, days_ago=0),
 
             # Drafts (pending)
-            make_trip("Chennai", "Bangalore", "MH12CD5678", "Alex Kumar",   5500, 350, 6.0, 40000, TripStatus.DRAFT),
+            make_trip("Chennai", "Bangalore", "MH12CD5678", "Dan Driver",   5500, 350, 6.0, 40000, TripStatus.DRAFT),
             make_trip("Mumbai",  "Surat",     "GJ09IJ7890", "Deepak Mehta", 6000, 280, 5.0, 30000, TripStatus.DRAFT),
             make_trip("Delhi",   "Agra",      "TN01AB1234", "Kavitha Raj",   300, 200, 3.5, 11000, TripStatus.DRAFT),
         ]

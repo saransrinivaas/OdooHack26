@@ -74,7 +74,7 @@ def create_trip(body: TripCreate, db: Session = Depends(get_db),
     """Create a Draft trip. All mandatory rules are validated up-front."""
     vehicle = db.query(Vehicle).get(body.vehicle_id)
     driver = db.query(Driver).get(body.driver_id)
-    business.validate_assignment(db, vehicle, driver, body.cargo_weight)
+    business.validate_assignment(db, vehicle, driver, body.cargo_weight, body.planned_duration or 0.0)
 
     t = Trip(
         source=body.source, destination=body.destination,
