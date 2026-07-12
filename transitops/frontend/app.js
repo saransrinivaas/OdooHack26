@@ -788,7 +788,7 @@ window.editTripModal = async function(id) {
             <div class="fw-600 text-sm">Smart Suggestion Algorithm</div>
             <div class="text-muted text-sm">Finds the optimal vehicle and driver match</div>
           </div>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-edit-suggest">Run Suggestion</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-edit-suggest">Assign Driver/Vehicle</button>
         </div>
         ` : ''}
         
@@ -825,10 +825,10 @@ window.editTripModal = async function(id) {
           method: "POST",
           body: JSON.stringify({ cargo_weight: parseFloat(cargo) })
         });
-        if (res && res.vehicle_id && res.driver_id) {
-          document.getElementById("et-vehicle").value = res.vehicle_id;
-          document.getElementById("et-driver").value = res.driver_id;
-          showToast(`Suggested: ${res.vehicle_name} & ${res.driver_name} (Score: ${Math.round(res.score * 100)}%)`);
+        if (res && res.best && res.best.vehicle_id && res.best.driver_id) {
+          document.getElementById("et-vehicle").value = res.best.vehicle_id;
+          document.getElementById("et-driver").value = res.best.driver_id;
+          showToast(`Suggested: ${res.best.vehicle} & ${res.best.driver} (Score: ${Math.round(res.best.score * 100)}%)`);
         } else {
           showToast("No eligible vehicle/driver match found for this load capacity.", "error");
         }
@@ -909,7 +909,7 @@ async function showNewTripModal(callback) {
             <div class="fw-600 text-sm">Smart Suggestion Algorithm</div>
             <div class="text-muted text-sm">Finds the optimal vehicle and driver match</div>
           </div>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-smart-suggest">Run Suggestion</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-smart-suggest">Assign Driver/Vehicle</button>
         </div>
         
         <div class="form-group">
@@ -959,10 +959,10 @@ async function showNewTripModal(callback) {
         method: "POST",
         body: JSON.stringify({ cargo_weight: parseFloat(cargo) })
       });
-      if (res && res.vehicle_id && res.driver_id) {
-        document.getElementById("t-vehicle").value = res.vehicle_id;
-        document.getElementById("t-driver").value = res.driver_id;
-        showToast(`Suggested: ${res.vehicle_name} & ${res.driver_name} (Score: ${Math.round(res.score * 100)}%)`);
+      if (res && res.best && res.best.vehicle_id && res.best.driver_id) {
+        document.getElementById("t-vehicle").value = res.best.vehicle_id;
+        document.getElementById("t-driver").value = res.best.driver_id;
+        showToast(`Suggested: ${res.best.vehicle} & ${res.best.driver} (Score: ${Math.round(res.best.score * 100)}%)`);
       } else {
         showToast("No eligible vehicle/driver match found for this load capacity.", "error");
       }
@@ -1475,6 +1475,10 @@ async function renderDriverRoster(host) {
     
     let uploadedFile = null;
 
+    document.getElementById("d-license-img").addEventListener("change", () => {
+      document.getElementById("btn-scan-ocr").click();
+    });
+ 
     document.getElementById("btn-scan-ocr").addEventListener("click", async () => {
       const fileInput = document.getElementById("d-license-img");
       if (!fileInput.files || fileInput.files.length === 0) {
