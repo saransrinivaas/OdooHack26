@@ -147,14 +147,8 @@ function applyAccentColors(role) {
 // Sign-in tab toggle
 document.getElementById("tab-login").addEventListener("click", () => {
   document.getElementById("tab-login").classList.add("active");
-  document.getElementById("tab-signup").classList.remove("active");
   document.getElementById("login-form-wrap").style.display = "block";
-  document.getElementById("signup-form-wrap").style.display = "none";
 });
-
-// Hide signup tab completely as per requirements
-document.getElementById("tab-signup").style.display = "none";
-document.getElementById("signup-form-wrap").style.display = "none";
 
 // Login Form Submit
 document.getElementById("login-form").addEventListener("submit", async (e) => {
