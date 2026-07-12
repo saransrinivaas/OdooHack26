@@ -1,0 +1,14 @@
+# Secrets — never commit
+.env
+*.env
+
+# Runtime data — regenerated on first launch
+backend/transitops.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

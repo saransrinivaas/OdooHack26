@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TransitOps — Smart Transport Operations</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { brand: {
+        50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',
+        500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'
+      }}}}
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-thumb{background:#c7d2fe;border-radius:6px}
+    .dark ::-webkit-scrollbar-thumb{background:#4338ca}
+    [x-cloak]{display:none!important}
+    .fade-in{animation:fi .25s ease}
+    @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .toast-in{animation:ti .3s cubic-bezier(.2,.8,.2,1)}
+    @keyframes ti{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+  </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen antialiased">
+
+  <!-- ===================== LOGIN ===================== -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4
+       bg-gradient-to-br from-brand-600 via-indigo-700 to-slate-900">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-8 fade-in">
+      <div class="flex items-center gap-3 mb-1">
+        <div class="w-11 h-11 rounded-xl bg-brand-600 text-white grid place-items-center text-xl font-bold">🚚</div>
+        <div>
+          <h1 class="text-2xl font-extrabold tracking-tight">TransitOps</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Smart Transport Operations Platform</p>
+        </div>
+      </div>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 mt-3">Sign in to continue</p>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Email</label>
+          <input id="login-email" type="email" required autocomplete="username"
+            class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-brand-500 outline-none"
+            placeholder="you@transitops.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input id="login-password" type="password" required autocomplete="current-password"
+            class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-brand-500 outline-none"
+            placeholder="••••••••">
+        </div>
+        <p id="login-error" class="text-sm text-red-600 hidden"></p>
+        <button type="submit" class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold transition">
+          Sign in
+        </button>
+      </form>
+      <div class="mt-6">
+        <p class="text-xs uppercase tracking-wider text-slate-400 mb-2 text-center">Quick demo login</p>
+        <div id="demo-accounts" class="grid grid-cols-2 gap-2 text-xs"></div>
+        <p class="text-[11px] text-slate-400 mt-3 text-center">All demo passwords: <code>transitops123</code></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== APP SHELL ===================== -->
+  <div id="app" class="hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed z-30 inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform -translate-x-full lg:translate-x-0 transition-transform">
+      <div class="h-16 flex items-center gap-2 px-5 border-b border-slate-200 dark:border-slate-800">
+        <div class="w-9 h-9 rounded-lg bg-brand-600 text-white grid place-items-center font-bold">🚚</div>
+        <span class="font-extrabold text-lg">TransitOps</span>
+      </div>
+      <nav id="nav" class="p-3 space-y-1 text-sm"></nav>
+    </aside>
+    <div id="backdrop" class="fixed inset-0 bg-black/40 z-20 hidden lg:hidden"></div>
+
+    <!-- Main -->
+    <div class="lg:pl-64">
+      <!-- Topbar -->
+      <header class="h-16 sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-6">
+        <div class="flex items-center gap-3">
+          <button id="menu-btn" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">☰</button>
+          <h2 id="page-title" class="text-lg font-bold">Dashboard</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="theme-toggle" title="Toggle dark mode"
+            class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
+          <div class="flex items-center gap-2 pl-2">
+            <div class="text-right hidden sm:block">
+              <div id="user-name" class="text-sm font-semibold leading-tight"></div>
+              <div id="user-role" class="text-xs text-slate-500"></div>
+            </div>
+            <div id="user-avatar" class="w-9 h-9 rounded-full bg-brand-600 text-white grid place-items-center text-sm font-bold"></div>
+            <button id="logout-btn" title="Log out"
+              class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">⎋</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page content -->
+      <main id="page" class="p-4 lg:p-6 max-w-[1400px] mx-auto"></main>
+    </div>
+  </div>
+
+  <!-- Modal host -->
+  <div id="modal-host" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-black/50">
+    <div id="modal-card" class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto fade-in"></div>
+  </div>
+
+  <!-- Toast host -->
+  <div id="toast-host" class="fixed z-50 bottom-4 right-4 space-y-2 w-80"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

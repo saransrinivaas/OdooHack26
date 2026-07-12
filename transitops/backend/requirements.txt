@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+python-multipart
+requests
+python-dotenv
+PyJWT
+reportlab
+Pillow
