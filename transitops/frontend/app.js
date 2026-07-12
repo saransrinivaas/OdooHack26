@@ -1497,7 +1497,7 @@ async function renderDriverRoster(host) {
       try {
         const res = await fetch("/api/documents/scan-licence", {
           method: "POST",
-          headers: { "Authorization": \`Bearer \${state.token}\` },
+          headers: { "Authorization": `Bearer ${state.token}` },
           body: formData
         });
         if (!res.ok) throw new Error("OCR Failed");
@@ -1507,13 +1507,13 @@ async function renderDriverRoster(host) {
           if (data.fields.name) document.getElementById("d-name").value = data.fields.name;
           if (data.fields.license_no) document.getElementById("d-lic-num").value = data.fields.license_no;
           if (data.fields.classes) document.getElementById("d-lic-cat").value = data.fields.classes.join(", ");
-          status.innerHTML = `<span style="color:var(--c-green)">OCR Success! Verify fields below. Verdict: \${data.verdict.name}</span>`;
+          status.innerHTML = `<span style="color:var(--c-green)">OCR Success! Verify fields below. Verdict: ${data.verdict.name}</span>`;
           showToast("License scanned successfully");
         } else {
           status.innerHTML = `<span style="color:var(--c-red)">Not recognized as a valid driving license.</span>`;
         }
       } catch(e) {
-        status.innerHTML = `<span style="color:var(--c-red)">OCR Error: \${e.message}</span>`;
+        status.innerHTML = `<span style="color:var(--c-red)">OCR Error: ${e.message}</span>`;
       }
     });
 
@@ -1547,7 +1547,7 @@ async function renderDriverRoster(host) {
           
           await fetch("/api/documents/upload", {
             method: "POST",
-            headers: { "Authorization": \`Bearer \${state.token}\` },
+            headers: { "Authorization": `Bearer ${state.token}` },
             body: docForm
           });
         }
