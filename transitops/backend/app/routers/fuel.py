@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,7 +22,7 @@ def _out(db: Session, f: FuelLog) -> FuelOut:
 
 
 @router.get("", response_model=list[FuelOut])
-def list_fuel(vehicle_id: int | None = Query(None), db: Session = Depends(get_db),
+def list_fuel(vehicle_id: Optional[int] = Query(None), db: Session = Depends(get_db),
               _: User = Depends(get_current_user)):
     q = db.query(FuelLog)
     if vehicle_id:

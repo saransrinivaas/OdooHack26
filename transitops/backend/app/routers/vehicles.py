@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -17,10 +18,10 @@ acq_roles = require_roles(Role.FINANCIAL_ANALYST, Role.FLEET_MANAGER)
 
 @router.get("", response_model=list[VehicleOut])
 def list_vehicles(
-    status: str | None = Query(None),
-    type: str | None = Query(None),
-    region: str | None = Query(None),
-    search: str | None = Query(None),
+    status: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     sort: str = Query("registration_number"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),

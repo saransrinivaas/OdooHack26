@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,7 +22,7 @@ def _out(db: Session, m: MaintenanceLog) -> MaintenanceOut:
 
 
 @router.get("", response_model=list[MaintenanceOut])
-def list_logs(status: str | None = Query(None), vehicle_id: int | None = Query(None),
+def list_logs(status: Optional[str] = Query(None), vehicle_id: Optional[int] = Query(None),
               db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     q = db.query(MaintenanceLog)
     if status:

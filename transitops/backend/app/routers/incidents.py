@@ -1,3 +1,4 @@
+from typing import Optional
 """Safety incident / violation log (Safety Officer). Feeds the driver rating's
 incident-free component."""
 from datetime import datetime
@@ -22,7 +23,7 @@ def _out(db: Session, i: Incident) -> IncidentOut:
 
 
 @router.get("", response_model=list[IncidentOut])
-def list_incidents(driver_id: int | None = Query(None), status: str | None = Query(None),
+def list_incidents(driver_id: Optional[int] = Query(None), status: Optional[str] = Query(None),
                    db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     q = db.query(Incident)
     if driver_id:

@@ -5,3 +5,7 @@ keys.json
 # Python
 __pycache__/
 *.pyc
+relax_requirements.py
+fix_union_types.py
+venv/
+

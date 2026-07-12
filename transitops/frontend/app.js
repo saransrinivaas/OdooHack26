@@ -1,1092 +1,2841 @@
-/* ============================================================================
- * TransitOps — frontend SPA (vanilla JS, no build step)
- * Talks to the FastAPI backend under /api. Hash-based routing.
- * ==========================================================================*/
+/* TransitOps — SPA Application Logic
+   ============================================================ */
 
-const State = {
-  token: localStorage.getItem('to_token') || null,
-  user: JSON.parse(localStorage.getItem('to_user') || 'null'),
-  route: 'dashboard',
+// Icons (SVG paths from Heroicons)
+const ICONS = {
+  dashboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>`,
+  trips: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  vehicles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+  maintenance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+  documents: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  roster: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  profile: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  compliance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  incident: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  finance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  report: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  users: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
 };
 
-/* ---- Role-based UI permissions — mirrors the PDF permission matrix.
-       Backend enforces the real thing; Admin passes everything. ------------*/
-const PERMS = {
-  vehicles:       ['Fleet Manager'],                     // registry CRUD
-  drivers:        ['Safety Officer'],                    // licence data, suspend, safety score
-  trips:          ['Fleet Manager'],                     // create / dispatch / cancel
-  trips_complete: ['Fleet Manager', 'Driver'],           // execution: complete a trip
-  maintenance:    ['Fleet Manager'],
-  fuel:           ['Fleet Manager', 'Driver'],
-  expenses:       ['Fleet Manager', 'Financial Analyst'],
-  revenue:        ['Fleet Manager', 'Financial Analyst'],
-  acq_cost:       ['Fleet Manager', 'Financial Analyst'],
-  documents:      ['Safety Officer', 'Fleet Manager'],
-  reminders:      ['Safety Officer', 'Fleet Manager'],
-  incidents:      ['Safety Officer'],
+const Role = {
+  FLEET_MANAGER: "Fleet Manager",
+  DRIVER: "Driver",
+  SAFETY_OFFICER: "Safety Officer",
+  FINANCIAL_ANALYST: "Financial Analyst",
+  ADMIN: "Admin"
 };
-const can = (area) => !!State.user &&
-  (State.user.role === 'Admin' || (PERMS[area] || []).includes(State.user.role));
 
-const NAV = [
-  { id: 'dashboard',   label: 'Dashboard',      icon: '📊' },
-  { id: 'vehicles',    label: 'Vehicles',       icon: '🚙' },
-  { id: 'drivers',     label: 'Drivers',        icon: '🧑‍✈️' },
-  { id: 'trips',       label: 'Trips',          icon: '🗺️' },
-  { id: 'maintenance', label: 'Maintenance',    icon: '🔧' },
-  { id: 'fuel',        label: 'Fuel & Expenses',icon: '⛽' },
-  { id: 'incidents',   label: 'Incidents',      icon: '🚨' },
-  { id: 'documents',   label: 'Documents / OCR',icon: '📄' },
-  { id: 'reports',     label: 'Reports',        icon: '📈' },
-];
+const ACCENTS = {
+  [Role.FLEET_MANAGER]: { color: "#4f46e5", light: "#eef2ff" },
+  [Role.DRIVER]: { color: "#0d9488", light: "#f0fdfa" },
+  [Role.SAFETY_OFFICER]: { color: "#d97706", light: "#fffbeb" },
+  [Role.FINANCIAL_ANALYST]: { color: "#059669", light: "#ecfdf5" },
+  [Role.ADMIN]: { color: "#7c3aed", light: "#f5f3ff" }
+};
 
-/* ---- Star rating renderer (1-3 stars, half-star precision) ---------------*/
-function stars(value, band) {
-  const full = Math.floor(value);
-  const half = value - full >= 0.5;
-  let s = '★'.repeat(full) + (half ? '½' : '');
-  const color = band === 'green' ? 'text-emerald-500' : band === 'red' ? 'text-red-500' : 'text-amber-500';
-  return `<span class="${color} font-semibold" title="${value} stars (max 3)">${s || '—'}</span>`;
+// Global App State
+let state = {
+  token: localStorage.getItem("token"),
+  role: localStorage.getItem("role"),
+  name: localStorage.getItem("name"),
+  email: localStorage.getItem("email"),
+  currentPage: "dashboard",
+  theme: localStorage.getItem("theme") || "light",
+  activeAccidentsCount: 0
+};
+
+// Initialize theme
+document.documentElement.setAttribute("data-theme", state.theme);
+
+// Toast utility
+function showToast(message, type = "success") {
+  const host = document.getElementById("toast-host");
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    ${type === 'success' ? '<span style="color:var(--c-green)">✓</span>' : '<span style="color:var(--c-red)">✗</span>'}
+    <span>${message}</span>
+  `;
+  host.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
 }
-async function ratingMap(kind) {
-  try {
-    const rows = await api(`/ratings/${kind}`);
-    const key = kind === 'drivers' ? 'driver_id' : 'vehicle_id';
-    return Object.fromEntries(rows.map(r => [r[key], r]));
-  } catch { return {}; }
-}
 
-const DEMO_ACCOUNTS = [
-  { role: 'Fleet Manager',    email: 'manager@transitops.com' },
-  { role: 'Driver',           email: 'driver@transitops.com' },
-  { role: 'Safety Officer',   email: 'safety@transitops.com' },
-  { role: 'Financial Analyst',email: 'finance@transitops.com' },
-  { role: 'Admin',            email: 'admin@transitops.com' },
-];
-
-/* ============================ API helper =================================*/
-async function api(path, { method = 'GET', body = null, form = null } = {}) {
-  const headers = {};
-  if (State.token) headers['Authorization'] = `Bearer ${State.token}`;
-  let payload;
-  if (form) { payload = form; }
-  else if (body) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`/api${path}`, { method, headers, body: payload });
-  if (res.status === 401) { logout(); throw new Error('Session expired — please sign in again.'); }
-  const isJson = (res.headers.get('content-type') || '').includes('application/json');
-  const data = isJson ? await res.json() : await res.blob();
-  if (!res.ok) {
-    const msg = (data && data.detail) ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : `Request failed (${res.status})`;
-    throw new Error(msg);
+// Request helper
+async function request(url, options = {}) {
+  options.headers = options.headers || {};
+  if (state.token) {
+    options.headers["Authorization"] = `Bearer ${state.token}`;
   }
-  return data;
+  options.headers["Content-Type"] = "application/json";
+  
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401 || res.status === 403) {
+      logout();
+      throw new Error("Session expired.");
+    }
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Server error.");
+    }
+    return await res.json();
+  } catch (err) {
+    showToast(err.message, "error");
+    throw err;
+  }
 }
 
-/* ============================ Tiny helpers ==============================*/
-const $ = (sel, el = document) => el.querySelector(sel);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const money = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-const num = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 1 });
-const initials = (name) => (name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-
-function toast(message, type = 'info') {
-  const colors = { info: 'bg-slate-800', success: 'bg-emerald-600', error: 'bg-red-600', warn: 'bg-amber-500' };
-  const el = document.createElement('div');
-  el.className = `toast-in ${colors[type] || colors.info} text-white text-sm px-4 py-3 rounded-xl shadow-lg flex items-start gap-2`;
-  el.innerHTML = `<span>${type === 'error' ? '⛔' : type === 'success' ? '✅' : type === 'warn' ? '⚠️' : 'ℹ️'}</span><span class="flex-1">${esc(message)}</span>`;
-  $('#toast-host').appendChild(el);
-  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3600);
+// Set active theme UI icons
+function updateThemeIcon() {
+  const moon = document.getElementById("theme-icon-moon");
+  const sun = document.getElementById("theme-icon-sun");
+  if (state.theme === "dark") {
+    moon.style.display = "none";
+    sun.style.display = "block";
+  } else {
+    moon.style.display = "block";
+    sun.style.display = "none";
+  }
 }
 
-const STATUS_BADGE = {
-  'Available': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  'On Trip': 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  'In Shop': 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  'Retired': 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  'Off Duty': 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  'Suspended': 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  'Draft': 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  'Dispatched': 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  'Completed': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  'Cancelled': 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  'Open': 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  'Closed': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-};
-const badge = (status) => `<span class="px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[status] || 'bg-slate-200 text-slate-600'}">${esc(status)}</span>`;
+// Dark Mode Toggle
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  state.theme = state.theme === "light" ? "dark" : "light";
+  localStorage.setItem("theme", state.theme);
+  document.documentElement.setAttribute("data-theme", state.theme);
+  updateThemeIcon();
+});
 
-/* ============================ Modal ====================================*/
-function openModal(title, innerHTML, onMount) {
-  const host = $('#modal-host'), card = $('#modal-card');
-  card.innerHTML = `
-    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 rounded-t-2xl">
-      <h3 class="text-lg font-bold">${esc(title)}</h3>
-      <button id="modal-close" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">✕</button>
-    </div>
-    <div class="p-6">${innerHTML}</div>`;
-  host.classList.remove('hidden'); host.classList.add('flex');
-  $('#modal-close').onclick = closeModal;
-  host.onclick = (e) => { if (e.target === host) closeModal(); };
-  if (onMount) onMount(card);
+// Mobile Sidebar Toggle
+document.getElementById("menu-btn").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sidebar-overlay").classList.toggle("visible");
+});
+document.getElementById("sidebar-overlay").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebar-overlay").classList.remove("visible");
+});
+
+// Rating Stars Renderer
+function renderStars(rating, band = "") {
+  let colorClass = "";
+  if (band === "green") colorClass = "green";
+  else if (band === "amber") colorClass = "amber";
+  else if (band === "red") colorClass = "red";
+  
+  let fullStars = Math.floor(rating);
+  let halfStar = rating % 1 >= 0.5 ? 1 : 0;
+  let emptyStars = 3 - fullStars - halfStar;
+  
+  let starsStr = "";
+  for (let i = 0; i < fullStars; i++) starsStr += "★";
+  if (halfStar) starsStr += "½";
+  for (let i = 0; i < emptyStars; i++) starsStr += "☆";
+  
+  return `<span class="stars ${colorClass}">${starsStr} (${rating})</span>`;
 }
-function closeModal() { const h = $('#modal-host'); h.classList.add('hidden'); h.classList.remove('flex'); $('#modal-card').innerHTML = ''; }
 
-const field = (label, name, opts = {}) => {
-  const { type = 'text', value = '', required = false, step = null, placeholder = '' } = opts;
-  return `<div>
-    <label class="block text-sm font-medium mb-1">${esc(label)}</label>
-    <input name="${name}" type="${type}" ${step ? `step="${step}"` : ''} ${required ? 'required' : ''}
-      value="${esc(value)}" placeholder="${esc(placeholder)}"
-      class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-brand-500 outline-none">
-  </div>`;
-};
-const selectField = (label, name, options, value = '') => `<div>
-    <label class="block text-sm font-medium mb-1">${esc(label)}</label>
-    <select name="${name}" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-brand-500 outline-none">
-      ${options.map(o => { const v = o.value ?? o; const l = o.label ?? o; return `<option value="${esc(v)}" ${String(v) === String(value) ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}
-    </select></div>`;
-const formData = (formEl) => { const o = {}; new FormData(formEl).forEach((v, k) => o[k] = v); return o; };
+// Setup Accent colors dynamically based on logged role
+function applyAccentColors(role) {
+  const accent = ACCENTS[role] || ACCENTS[Role.DRIVER];
+  document.documentElement.style.setProperty("--c-accent", accent.color);
+  document.documentElement.style.setProperty("--c-accent-light", accent.light);
+}
 
-/* ============================ Auth =====================================*/
-function renderDemoAccounts() {
-  $('#demo-accounts').innerHTML = DEMO_ACCOUNTS.map(a =>
-    `<button data-email="${a.email}" class="demo-btn px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-brand-50 dark:hover:bg-slate-800 text-left">
-      <div class="font-semibold">${esc(a.role)}</div>
-      <div class="text-[10px] text-slate-400 truncate">${esc(a.email)}</div>
-    </button>`).join('');
-  document.querySelectorAll('.demo-btn').forEach(b => b.onclick = () => {
-    $('#login-email').value = b.dataset.email; $('#login-password').value = 'transitops123';
+// Sign-in tab toggle
+document.getElementById("tab-login").addEventListener("click", () => {
+  document.getElementById("tab-login").classList.add("active");
+  document.getElementById("tab-signup").classList.remove("active");
+  document.getElementById("login-form-wrap").style.display = "block";
+  document.getElementById("signup-form-wrap").style.display = "none";
+});
+
+// Hide signup tab completely as per requirements
+document.getElementById("tab-signup").style.display = "none";
+document.getElementById("signup-form-wrap").style.display = "none";
+
+// Login Form Submit
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-password").value;
+  const errorEl = document.getElementById("login-error");
+  errorEl.classList.remove("visible");
+  
+  try {
+    const res = await fetch("/api/auth/login-json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Invalid email or password.");
+    }
+    const data = await res.ok ? await res.json() : {};
+    loginSuccess(data);
+  } catch (err) {
+    errorEl.innerText = err.message;
+    errorEl.classList.add("visible");
+  }
+});
+
+// Signup Form Submit
+document.getElementById("signup-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("su-name").value;
+  const email = document.getElementById("su-email").value;
+  const password = document.getElementById("su-password").value;
+  const phone = document.getElementById("su-phone").value;
+  const licNum = document.getElementById("su-lic-num").value;
+  const licCat = document.getElementById("su-lic-cat").value;
+  const licExp = document.getElementById("su-lic-expiry").value || null;
+  const errorEl = document.getElementById("signup-error");
+  errorEl.classList.remove("visible");
+  
+  try {
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name, email, password, license_number: licNum,
+        license_category: licCat, license_expiry: licExp, contact_number: phone
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Sign up failed.");
+    }
+    const data = await res.json();
+    showToast("Registration successful!");
+    loginSuccess(data);
+  } catch (err) {
+    errorEl.innerText = err.message;
+    errorEl.classList.add("visible");
+  }
+});
+
+// Demo accounts filler
+const DEMO_ACCS = [
+  { role: "Fleet Manager", email: "manager@transitops.com" },
+  { role: "Driver", email: "driver@transitops.com" },
+  { role: "Safety Officer", email: "safety@transitops.com" },
+  { role: "Financial Analyst", email: "finance@transitops.com" },
+  { role: "Admin", email: "admin@transitops.com" }
+];
+const demoHost = document.getElementById("demo-accounts");
+DEMO_ACCS.forEach(acc => {
+  const btn = document.createElement("button");
+  btn.className = "btn btn-secondary btn-sm";
+  btn.innerText = acc.role;
+  btn.addEventListener("click", () => {
+    document.getElementById("login-email").value = acc.email;
+    document.getElementById("login-password").value = "transitops123";
   });
-}
+  demoHost.appendChild(btn);
+});
 
-async function doLogin(email, password) {
-  const data = await api('/auth/login-json', { method: 'POST', body: { email, password } });
-  State.token = data.access_token;
-  State.user = { name: data.name, role: data.role, email: data.email };
-  localStorage.setItem('to_token', State.token);
-  localStorage.setItem('to_user', JSON.stringify(State.user));
+function loginSuccess(data) {
+  state.token = data.access_token;
+  state.role = data.role;
+  state.name = data.name;
+  state.email = data.email;
+  
+  localStorage.setItem("token", data.access_token);
+  localStorage.setItem("role", data.role);
+  localStorage.setItem("name", data.name);
+  localStorage.setItem("email", data.email);
+  
+  initApp();
 }
 
 function logout() {
-  State.token = null; State.user = null;
-  localStorage.removeItem('to_token'); localStorage.removeItem('to_user');
-  $('#app').classList.add('hidden');
-  $('#login-screen').classList.remove('hidden');
+  state.token = null;
+  state.role = null;
+  state.name = null;
+  state.email = null;
+  localStorage.removeItem("token");
+  localStorage.removeItem("role");
+  localStorage.removeItem("name");
+  localStorage.removeItem("email");
+  
+  document.getElementById("app").classList.remove("visible");
+  document.getElementById("auth-screen").style.display = "flex";
 }
 
-function showApp() {
-  $('#login-screen').classList.add('hidden');
-  $('#app').classList.remove('hidden');
-  $('#user-name').textContent = State.user.name;
-  $('#user-role').textContent = State.user.role;
-  $('#user-avatar').textContent = initials(State.user.name);
-  renderNav();
-  navigate(location.hash.replace('#', '') || 'dashboard');
-}
+document.getElementById("logout-btn").addEventListener("click", logout);
 
-/* ============================ Nav + routing ============================*/
-function renderNav() {
-  $('#nav').innerHTML = NAV.map(n =>
-    `<a href="#${n.id}" data-route="${n.id}"
-        class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
-       <span class="text-lg">${n.icon}</span><span class="font-medium">${n.label}</span>
-     </a>`).join('') +
-    `<div class="pt-3 mt-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-400 px-3">
-       Signed in as<br><span class="font-semibold text-slate-500 dark:text-slate-300">${esc(State.user.role)}</span>
-     </div>`;
-  document.querySelectorAll('.nav-link').forEach(a => a.onclick = () => closeSidebar());
-}
-
-function highlightNav() {
-  document.querySelectorAll('.nav-link').forEach(a => {
-    const active = a.dataset.route === State.route;
-    a.classList.toggle('bg-brand-600', active);
-    a.classList.toggle('text-white', active);
-    a.classList.toggle('hover:bg-brand-600', active);
-  });
-}
-
-const PAGES = {}; // filled below
-async function navigate(route) {
-  if (!PAGES[route]) route = 'dashboard';
-  State.route = route;
-  location.hash = route;
-  $('#page-title').textContent = NAV.find(n => n.id === route)?.label || 'TransitOps';
-  highlightNav();
-  const page = $('#page');
-  page.innerHTML = `<div class="text-slate-400 text-sm">Loading…</div>`;
-  try { await PAGES[route](page); }
-  catch (e) { page.innerHTML = `<div class="text-red-600">⛔ ${esc(e.message)}</div>`; }
-}
-window.addEventListener('hashchange', () => { const r = location.hash.replace('#', ''); if (r && r !== State.route) navigate(r); });
-
-/* ============================ Shared table UI ==========================*/
-function toolbar({ search = true, onSearch, filters = [], actions = '' }) {
-  const wrap = document.createElement('div');
-  wrap.className = 'flex flex-wrap items-center gap-2 mb-4';
-  wrap.innerHTML =
-    (search ? `<input id="tb-search" placeholder="🔍 Search…" class="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm w-full sm:w-64 focus:ring-2 focus:ring-brand-500 outline-none">` : '') +
-    filters.map(f => `<select data-filter="${f.name}" class="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-        <option value="">${esc(f.label)}</option>
-        ${f.options.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}
-      </select>`).join('') +
-    `<div class="flex-1"></div>${actions}`;
-  if (search && onSearch) { let t; wrap.querySelector('#tb-search').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => onSearch(e.target.value), 250); }); }
-  return wrap;
-}
-const card = (inner, cls = '') => `<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 ${cls}">${inner}</div>`;
-const tableShell = (headers) => `
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead><tr class="text-left text-xs uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-slate-800">
-        ${headers.map(h => `<th class="px-4 py-3 font-semibold">${esc(h)}</th>`).join('')}
-      </tr></thead><tbody></tbody></table></div>`;
-const emptyRow = (cols, msg = 'No records yet.') => `<tr><td colspan="${cols}" class="px-4 py-10 text-center text-slate-400">${esc(msg)}</td></tr>`;
-const actionBtn = (label, cls = '') => `<button class="px-2.5 py-1 rounded-lg text-xs font-medium ${cls}">${label}</button>`;
-
-/* ============================ DASHBOARD ================================*/
-let charts = {};
-PAGES.dashboard = async function (page) {
-  const [filters, ov] = await Promise.all([api('/dashboard/filters'), api('/dashboard/overview')]);
-  page.innerHTML = `
-    <div class="mb-2 text-xs uppercase tracking-wider text-slate-400">Fleet overview</div>
-    <div id="overview-strip" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6"></div>
-    <div class="mb-2 text-xs uppercase tracking-wider text-slate-400">Fleet detail</div>
-    <div id="dash-filters" class="flex flex-wrap gap-2 mb-4"></div>
-    <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      ${card(`<div class="p-4"><h3 class="font-bold mb-3">Fleet Status</h3><div class="h-64"><canvas id="chart-status"></canvas></div></div>`)}
-      ${card(`<div class="p-4"><h3 class="font-bold mb-3">Cost vs Revenue (fleet)</h3><div class="h-64"><canvas id="chart-cost"></canvas></div></div>`)}
-    </div>`;
-  const fbar = $('#dash-filters');
-  fbar.innerHTML = [
-    { name: 'type', label: 'All types', options: filters.types },
-    { name: 'status', label: 'All statuses', options: filters.statuses },
-    { name: 'region', label: 'All regions', options: filters.regions },
-  ].map(f => `<select data-df="${f.name}" class="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
-      <option value="">${f.label}</option>${f.options.map(o => `<option>${esc(o)}</option>`).join('')}</select>`).join('');
-  fbar.querySelectorAll('[data-df]').forEach(s => s.onchange = loadKpis);
-
-  // The six consolidated high-level metrics (shown to every role)
-  const netColor = ov.net_profit >= 0 ? 'text-emerald-600' : 'text-red-600';
-  const flagColor = ov.open_safety_flags > 0 ? 'text-red-600' : 'text-emerald-600';
-  const compColor = ov.compliance_rate >= 90 ? 'text-emerald-600' : ov.compliance_rate >= 75 ? 'text-amber-600' : 'text-red-600';
-  const strip = [
-    ['Active Trips', ov.active_trips, '🚚', 'text-blue-600'],
-    ['Fleet Utilization', ov.fleet_utilization + '%', '📊', 'text-brand-600'],
-    ['Compliance Rate', ov.compliance_rate + '%', '🛡️', compColor],
-    ['Net Profit', money(ov.net_profit), '💰', netColor],
-    ['In Maintenance', ov.vehicles_in_maintenance, '🔧', 'text-amber-600'],
-    ['Safety Flags', ov.open_safety_flags, '⚠️', flagColor],
-  ];
-  $('#overview-strip').innerHTML = strip.map(([l, v, i, c]) => `
-    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 fade-in">
-      <div class="flex items-center justify-between"><span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide">${esc(l)}</span><span>${i}</span></div>
-      <div class="text-2xl font-extrabold mt-1 ${c}">${esc(v)}</div>
-    </div>`).join('');
-
-  await loadKpis();
-
-  async function loadKpis() {
-    const q = new URLSearchParams();
-    fbar.querySelectorAll('[data-df]').forEach(s => { if (s.value) q.set(s.dataset.df, s.value); });
-    const k = await api('/dashboard/kpis?' + q.toString());
-    const tiles = [
-      ['Active Vehicles', k.active_vehicles, '🚙', 'text-brand-600'],
-      ['Available', k.available_vehicles, '✅', 'text-emerald-600'],
-      ['In Maintenance', k.in_maintenance, '🔧', 'text-amber-600'],
-      ['Fleet Utilization', k.fleet_utilization + '%', '📊', 'text-indigo-600'],
-      ['Active Trips', k.active_trips, '🚚', 'text-blue-600'],
-      ['Pending Trips', k.pending_trips, '🕒', 'text-slate-500'],
-      ['Drivers On Duty', k.drivers_on_duty, '🧑‍✈️', 'text-blue-600'],
-      ['Open Maintenance', k.open_maintenance, '🛠️', 'text-amber-600'],
+// Initialize Navigation and views
+function buildSidebarNav() {
+  const nav = document.getElementById("nav");
+  nav.innerHTML = "";
+  
+  let menu = [];
+  if (state.role === Role.ADMIN) {
+    menu = [
+      { page: "admin_overview", label: "System Overview", icon: "dashboard" },
+      { page: "admin_users", label: "User Accounts", icon: "users" }
     ];
-    $('#kpi-grid').innerHTML = tiles.map(([label, val, icon, color]) => `
-      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 fade-in">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">${esc(label)}</span>
-          <span class="text-lg">${icon}</span>
+  } else if (state.role === Role.FLEET_MANAGER) {
+    menu = [
+      { page: "dashboard", label: "Dashboard", icon: "dashboard" },
+      { page: "trips", label: "Trip Board", icon: "trips" },
+      { page: "vehicles", label: "Vehicle Registry", icon: "vehicles" },
+      { page: "maintenance", label: "Maintenance Logs", icon: "maintenance" },
+      { page: "documents", label: "Vehicle Documents", icon: "documents" },
+      { page: "roster", label: "Driver Roster", icon: "roster" }
+    ];
+  } else if (state.role === Role.DRIVER) {
+    menu = [
+      { page: "driver_trips", label: "My Trips", icon: "trips" },
+      { page: "driver_vehicle", label: "My Vehicle", icon: "vehicles" },
+      { page: "driver_profile", label: "My Profile", icon: "profile" }
+    ];
+  } else if (state.role === Role.SAFETY_OFFICER) {
+    menu = [
+      { page: "safety_compliance", label: "Compliance Board", icon: "compliance" },
+      { page: "safety_drivers", label: "Driver Directory", icon: "roster" },
+      { page: "safety_scores", label: "Safety Ratings", icon: "profile" },
+      { page: "safety_incidents", label: "Incident Log", icon: "incident" }
+    ];
+  } else if (state.role === Role.FINANCIAL_ANALYST) {
+    menu = [
+      { page: "finance_dashboard", label: "Financial Dashboard", icon: "finance" },
+      { page: "finance_revenue", label: "Revenue & Costs", icon: "trips" },
+      { page: "finance_expenses", label: "Fuel & Expenses", icon: "vehicles" },
+      { page: "finance_maint", label: "Maintenance Cost", icon: "maintenance" },
+      { page: "finance_reports", label: "Reports & Export", icon: "report" }
+    ];
+  }
+  
+  menu.forEach(item => {
+    const btn = document.createElement("button");
+    btn.className = `nav-item ${state.currentPage === item.page ? 'active' : ''}`;
+    btn.innerHTML = `${ICONS[item.icon]} <span>${item.label}</span>`;
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.currentPage = item.page;
+      document.getElementById("sidebar").classList.remove("open");
+      document.getElementById("sidebar-overlay").classList.remove("visible");
+      renderPage();
+    });
+    nav.appendChild(btn);
+  });
+}
+
+// Show modal utility
+function showModal(title, bodyHtml, footerHtml) {
+  const card = document.getElementById("modal-card");
+  card.innerHTML = `
+    <div class="modal-header">
+      <h3 class="modal-title">${title}</h3>
+      <button class="icon-btn" id="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">${bodyHtml}</div>
+    <div class="modal-footer">${footerHtml}</div>
+  `;
+  document.getElementById("modal-backdrop").classList.add("open");
+  
+  document.getElementById("modal-close-btn").addEventListener("click", closeModal);
+}
+
+function closeModal() {
+  document.getElementById("modal-backdrop").classList.remove("open");
+}
+
+// Consolidated global metrics strip
+async function renderOverviewStrip(hostEl) {
+  try {
+    const data = await request("/api/reports/summary");
+    const complianceData = await request("/api/drivers");
+    const activeTripsCount = (await request("/api/trips")).filter(t => t.status === "Dispatched").length;
+    const incidentsData = await request("/api/incidents");
+    const maintenanceData = await request("/api/maintenance");
+    const vehiclesData = await request("/api/vehicles");
+    
+    // Fleet utilization calculation
+    const activeVehicles = vehiclesData.filter(v => v.status !== "Retired");
+    const onTripVehicles = vehiclesData.filter(v => v.status === "On Trip");
+    const utilizationPct = activeVehicles.length ? Math.round((onTripVehicles.length / activeVehicles.length) * 100) : 0;
+    
+    // Compliance rate calculation
+    const nonSuspendedDrivers = complianceData.filter(d => d.status !== "Suspended");
+    const compliantDrivers = nonSuspendedDrivers.filter(d => !d.license_expired);
+    const complianceRate = nonSuspendedDrivers.length ? Math.round((compliantDrivers.length / nonSuspendedDrivers.length) * 100) : 100;
+    
+    // In maintenance
+    const inShopCount = vehiclesData.filter(v => v.status === "In Shop").length;
+    
+    // Safety flags
+    const openIncidents = incidentsData.filter(i => i.status === "Open").length;
+    const safetyFlags = complianceData.filter(d => d.status === "Suspended").length + openIncidents;
+    
+    hostEl.innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Active Trips</div>
+          <div class="kpi-value">${activeTripsCount}</div>
+          <div class="kpi-sub text-muted">Trips currently on road</div>
         </div>
-        <div class="text-3xl font-extrabold mt-2 ${color}">${esc(val)}</div>
-      </div>`).join('');
-    drawStatusChart(k.status_breakdown);
-    drawCostChart();
+        <div class="kpi-card">
+          <div class="kpi-label">Fleet Utilization</div>
+          <div class="kpi-value">${utilizationPct}%</div>
+          <div class="kpi-sub text-muted">Out of ${activeVehicles.length} active assets</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Compliance Rate</div>
+          <div class="kpi-value ${complianceRate < 90 ? 'kpi-negative' : 'kpi-positive'}">${complianceRate}%</div>
+          <div class="kpi-sub text-muted">Drivers with valid licenses</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Net Profit</div>
+          <div class="kpi-value ${data.totals.net >= 0 ? 'kpi-positive' : 'kpi-negative'}">₹${data.totals.net.toLocaleString()}</div>
+          <div class="kpi-sub text-muted">Total revenue vs expenses</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">In Maintenance</div>
+          <div class="kpi-value">${inShopCount}</div>
+          <div class="kpi-sub text-muted">Vehicles currently in shop</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Safety Flags</div>
+          <div class="kpi-value ${safetyFlags > 0 ? 'kpi-negative' : 'kpi-neutral'}">${safetyFlags}</div>
+          <div class="kpi-sub text-muted">Unresolved incidents / blocks</div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    hostEl.innerHTML = `<div class="alert alert-error">Failed to load global metrics strip.</div>`;
   }
-};
-
-function chartTextColor() { return document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569'; }
-function drawStatusChart(bd) {
-  const ctx = $('#chart-status'); if (!ctx) return;
-  charts.status?.destroy();
-  charts.status = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels: Object.keys(bd), datasets: [{ data: Object.values(bd),
-      backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'], borderWidth: 0 }] },
-    options: { plugins: { legend: { position: 'bottom', labels: { color: chartTextColor() } } }, maintainAspectRatio: false }
-  });
 }
-async function drawCostChart() {
-  const ctx = $('#chart-cost'); if (!ctx) return;
-  const s = await api('/reports/summary'); const t = s.totals;
-  charts.cost?.destroy();
-  charts.cost = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: ['Fuel', 'Maintenance', 'Other', 'Revenue'],
-      datasets: [{ label: '₹', data: [t.fuel_cost, t.maintenance_cost, t.other_expenses, t.revenue],
-        backgroundColor: ['#6366f1', '#f59e0b', '#94a3b8', '#10b981'], borderRadius: 6 }] },
-    options: { plugins: { legend: { display: false } }, maintainAspectRatio: false,
-      scales: { x: { ticks: { color: chartTextColor() }, grid: { display: false } },
-                y: { ticks: { color: chartTextColor() }, grid: { color: 'rgba(148,163,184,.15)' } } } }
-  });
+
+// APP INITIALIZATION
+function initApp() {
+  document.getElementById("auth-screen").style.display = "none";
+  document.getElementById("app").classList.add("visible");
+  
+  applyAccentColors(state.role);
+  
+  // Set user shell details
+  document.getElementById("user-name").innerText = state.name;
+  document.getElementById("user-role").innerText = state.role;
+  document.getElementById("user-avatar").innerText = state.name ? state.name.substring(0,2).toUpperCase() : "US";
+  
+  // Determine default starting page based on role
+  if (state.role === Role.ADMIN) state.currentPage = "admin_overview";
+  else if (state.role === Role.FLEET_MANAGER) state.currentPage = "dashboard";
+  else if (state.role === Role.DRIVER) state.currentPage = "driver_trips";
+  else if (state.role === Role.SAFETY_OFFICER) state.currentPage = "safety_compliance";
+  else if (state.role === Role.FINANCIAL_ANALYST) state.currentPage = "finance_dashboard";
+  
+  updateThemeIcon();
+  buildSidebarNav();
+  renderPage();
 }
 
-/* ============================ VEHICLES ================================*/
-const VEHICLE_STATUSES = ['Available', 'On Trip', 'In Shop', 'Retired'];
-PAGES.vehicles = async function (page) {
-  const filters = await api('/dashboard/filters');
-  const actions = can('vehicles') ? `<button id="add-vehicle" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">+ Add Vehicle</button>` : '';
-  page.innerHTML = '';
-  const tb = toolbar({ onSearch: v => load({ search: v }), actions,
-    filters: [{ name: 'status', label: 'All statuses', options: VEHICLE_STATUSES },
-              { name: 'type', label: 'All types', options: filters.types }] });
-  page.appendChild(tb);
-  const host = document.createElement('div'); page.appendChild(host);
-  tb.querySelectorAll('[data-filter]').forEach(s => s.onchange = () => load());
-  if (can('vehicles')) tb.querySelector('#add-vehicle').onclick = () => vehicleForm();
-
-  async function load(extra = {}) {
-    const q = new URLSearchParams(extra);
-    tb.querySelectorAll('[data-filter]').forEach(s => { if (s.value) q.set(s.dataset.filter, s.value); });
-    const [rows, rmap] = await Promise.all([api('/vehicles?' + q.toString()), ratingMap('vehicles')]);
-    host.innerHTML = card(tableShell(['Reg. No', 'Name / Model', 'Type', 'Capacity', 'Odometer', 'Acq. Cost', 'Rating', 'Status', '']));
-    const tbody = host.querySelector('tbody');
-    if (!rows.length) { tbody.innerHTML = emptyRow(9); return; }
-    tbody.innerHTML = rows.map(v => `<tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-      <td class="px-4 py-3 font-mono font-semibold">${esc(v.registration_number)}</td>
-      <td class="px-4 py-3">${esc(v.name)}</td>
-      <td class="px-4 py-3">${esc(v.type)}</td>
-      <td class="px-4 py-3">${num(v.max_load_capacity)} kg</td>
-      <td class="px-4 py-3">${num(v.odometer)} km</td>
-      <td class="px-4 py-3">${money(v.acquisition_cost)}</td>
-      <td class="px-4 py-3">${rmap[v.id] ? stars(rmap[v.id].stars, rmap[v.id].band) : '—'}</td>
-      <td class="px-4 py-3">${badge(v.status)}</td>
-      <td class="px-4 py-3 text-right whitespace-nowrap">
-        ${can('vehicles') ? actionBtn('Edit', 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200') + ' ' + actionBtn('Delete', 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30') : '<span class="text-xs text-slate-400">view only</span>'}
-      </td></tr>`).join('');
-    if (can('vehicles')) tbody.querySelectorAll('tr').forEach((tr, i) => {
-      const [edit, del] = tr.querySelectorAll('button');
-      edit.onclick = () => vehicleForm(rows[i]);
-      del.onclick = () => confirmDelete(`vehicle ${rows[i].registration_number}`, async () => { await api(`/vehicles/${rows[i].id}`, { method: 'DELETE' }); toast('Vehicle removed', 'success'); load(); });
-    });
+// Main page router/renderer
+function renderPage() {
+  const pageHost = document.getElementById("page");
+  pageHost.innerHTML = `<div class="empty-state">Loading page views...</div>`;
+  
+  document.getElementById("page-title").innerText = state.currentPage.replace("_", " ").toUpperCase();
+  
+  switch(state.currentPage) {
+    case "dashboard":
+      renderFleetDashboard(pageHost);
+      break;
+    case "trips":
+      renderTripManagement(pageHost);
+      break;
+    case "vehicles":
+      renderVehicleRegistry(pageHost);
+      break;
+    case "maintenance":
+      renderMaintenanceLogs(pageHost);
+      break;
+    case "documents":
+      renderVehicleDocuments(pageHost);
+      break;
+    case "roster":
+      renderDriverRoster(pageHost);
+      break;
+    case "driver_trips":
+      renderDriverTrips(pageHost);
+      break;
+    case "driver_vehicle":
+      renderDriverVehicle(pageHost);
+      break;
+    case "driver_profile":
+      renderDriverProfile(pageHost);
+      break;
+    case "safety_compliance":
+      renderSafetyCompliance(pageHost);
+      break;
+    case "safety_drivers":
+      renderSafetyDrivers(pageHost);
+      break;
+    case "safety_scores":
+      renderSafetyScores(pageHost);
+      break;
+    case "safety_incidents":
+      renderSafetyIncidents(pageHost);
+      break;
+    case "finance_dashboard":
+      renderFinanceDashboard(pageHost);
+      break;
+    case "finance_revenue":
+      renderFinanceRevenue(pageHost);
+      break;
+    case "finance_expenses":
+      renderFinanceExpenses(pageHost);
+      break;
+    case "finance_maint":
+      renderFinanceMaint(pageHost);
+      break;
+    case "finance_reports":
+      renderFinanceReports(pageHost);
+      break;
+    case "admin_overview":
+      renderAdminOverview(pageHost);
+      break;
+    case "admin_users":
+      renderAdminUsers(pageHost);
+      break;
+    default:
+      pageHost.innerHTML = `<div class="empty-state">Page not found or role RBAC restricted.</div>`;
   }
-  load();
+}
 
-  function vehicleForm(v = null) {
-    openModal(v ? 'Edit Vehicle' : 'Add Vehicle', `<form id="vf" class="space-y-3">
-      ${field('Registration Number', 'registration_number', { value: v?.registration_number || '', required: true, placeholder: 'VAN-05' })}
-      ${field('Name / Model', 'name', { value: v?.name || '', required: true })}
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Type', 'type', { value: v?.type || '', required: true, placeholder: 'Van / Truck / Car' })}
-        ${field('Region', 'region', { value: v?.region || '' })}
+// -------------------------------------------------------------
+// FLEET MANAGER PAGES (6)
+// -------------------------------------------------------------
+
+async function renderFleetDashboard(host) {
+  host.innerHTML = `
+    <div id="metrics-strip"></div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Fleet Status Overview</div>
+        <div class="chart-body"><canvas id="fleetStatusChart"></canvas></div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Max Load (kg)', 'max_load_capacity', { type: 'number', step: '1', value: v?.max_load_capacity ?? '', required: true })}
-        ${field('Odometer (km)', 'odometer', { type: 'number', step: '1', value: v?.odometer ?? 0 })}
+      <div class="chart-card">
+        <div class="chart-title">Idle Vehicle Alerts (Status: Available & Idle)</div>
+        <div class="chart-body" id="idle-vehicles-list">Loading...</div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Acquisition Cost', 'acquisition_cost', { type: 'number', step: '1', value: v?.acquisition_cost ?? 0 })}
-        ${field('Acquisition Date', 'acquisition_date', { type: 'date', value: v?.acquisition_date || '' })}
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Service Interval (km)', 'service_interval_km', { type: 'number', step: '500', value: v?.service_interval_km ?? 10000 })}
-        ${selectField('Status', 'status', VEHICLE_STATUSES, v?.status || 'Available')}
-      </div>
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">${v ? 'Save changes' : 'Create vehicle'}</button>
-    </form>`, (root) => {
-      root.querySelector('#vf').onsubmit = async (e) => {
-        e.preventDefault();
-        const d = formData(e.target);
-        ['max_load_capacity', 'odometer', 'acquisition_cost', 'service_interval_km'].forEach(k => d[k] = parseFloat(d[k] || 0));
-        if (!d.acquisition_date) delete d.acquisition_date;
-        try {
-          if (v) await api(`/vehicles/${v.id}`, { method: 'PUT', body: d });
-          else await api('/vehicles', { method: 'POST', body: d });
-          toast(v ? 'Vehicle updated' : 'Vehicle created', 'success'); closeModal(); load();
-        } catch (err) { toast(err.message, 'error'); }
-      };
+    </div>
+  `;
+  
+  const strip = document.getElementById("metrics-strip");
+  renderOverviewStrip(strip);
+  
+  try {
+    const vehicles = await request("/api/vehicles");
+    const trips = await request("/api/trips");
+    
+    // Status breakdown chart
+    const statusCounts = { Available: 0, "On Trip": 0, "In Shop": 0, Retired: 0 };
+    vehicles.forEach(v => { statusCounts[v.status] = (statusCounts[v.status] || 0) + 1; });
+    
+    new Chart(document.getElementById("fleetStatusChart"), {
+      type: "doughnut",
+      data: {
+        labels: Object.keys(statusCounts),
+        datasets: [{
+          data: Object.values(statusCounts),
+          backgroundColor: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"]
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
     });
-  }
-};
-
-/* ============================ DRIVERS ================================*/
-const DRIVER_STATUSES = ['Available', 'On Trip', 'Off Duty', 'Suspended'];
-PAGES.drivers = async function (page) {
-  const actions = (can('reminders') ? `<button id="send-reminders" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold">✉️ Licence Reminders</button> ` : '') +
-    (can('drivers') ? `<button id="add-driver" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">+ Add Driver</button>` : '');
-  page.innerHTML = '';
-  const tb = toolbar({ onSearch: v => load({ search: v }), actions,
-    filters: [{ name: 'status', label: 'All statuses', options: DRIVER_STATUSES }] });
-  page.appendChild(tb);
-  const host = document.createElement('div'); page.appendChild(host);
-  tb.querySelectorAll('[data-filter]').forEach(s => s.onchange = () => load());
-  if (can('drivers')) tb.querySelector('#add-driver').onclick = () => driverForm();
-  if (can('reminders')) tb.querySelector('#send-reminders').onclick = remindersModal;
-
-  async function load(extra = {}) {
-    const q = new URLSearchParams(extra);
-    tb.querySelectorAll('[data-filter]').forEach(s => { if (s.value) q.set(s.dataset.filter, s.value); });
-    const [rows, rmap] = await Promise.all([api('/drivers?' + q.toString()), ratingMap('drivers')]);
-    host.innerHTML = card(tableShell(['Name', 'Licence No', 'Category', 'Expiry', 'Safety', 'Rating', 'Status', '']));
-    const tbody = host.querySelector('tbody');
-    if (!rows.length) { tbody.innerHTML = emptyRow(8); return; }
-    tbody.innerHTML = rows.map(d => `<tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-      <td class="px-4 py-3 font-semibold">${esc(d.name)}</td>
-      <td class="px-4 py-3 font-mono text-xs">${esc(d.license_number)}</td>
-      <td class="px-4 py-3">${esc(d.license_category || '—')}</td>
-      <td class="px-4 py-3">${d.license_expiry ? `<span class="${d.license_expired ? 'text-red-600 font-semibold' : ''}">${esc(d.license_expiry)}${d.license_expired ? ' ⚠️' : ''}</span>` : '—'}</td>
-      <td class="px-4 py-3">${scoreBar(d.safety_score)}</td>
-      <td class="px-4 py-3">${rmap[d.id] ? stars(rmap[d.id].stars, rmap[d.id].band) : '—'}</td>
-      <td class="px-4 py-3">${badge(d.status)}</td>
-      <td class="px-4 py-3 text-right whitespace-nowrap">
-        ${can('drivers') ? actionBtn('Edit', 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200') + ' ' + actionBtn('Delete', 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30') : '<span class="text-xs text-slate-400">view only</span>'}
-      </td></tr>`).join('');
-    if (can('drivers')) tbody.querySelectorAll('tr').forEach((tr, i) => {
-      const [edit, del] = tr.querySelectorAll('button');
-      edit.onclick = () => driverForm(rows[i]);
-      del.onclick = () => confirmDelete(`driver ${rows[i].name}`, async () => { await api(`/drivers/${rows[i].id}`, { method: 'DELETE' }); toast('Driver removed', 'success'); load(); });
-    });
-  }
-  load();
-
-  function driverForm(d = null) {
-    openModal(d ? 'Edit Driver' : 'Add Driver', `
-      <div class="mb-4 p-3 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-slate-800">
-        <div class="text-sm font-semibold mb-1">🪪 Auto-fill from licence image (OCR)</div>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Upload the driver's licence — instead of typing, the OCR reads the number, category, expiry &amp; name for you.</p>
-        <input id="df-lic" type="file" accept="image/*" class="block w-full text-xs mb-2 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white hover:file:bg-brand-700">
-        <button type="button" id="df-scan" class="w-full py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">Scan &amp; auto-fill</button>
-        <div id="df-scan-result" class="mt-2 text-xs"></div>
-      </div>
-      <form id="df" class="space-y-3">
-      ${field('Name', 'name', { value: d?.name || '', required: true })}
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Licence Number', 'license_number', { value: d?.license_number || '', required: true, placeholder: 'TN02 20240006663' })}
-        ${field('Licence Category', 'license_category', { value: d?.license_category || '', placeholder: 'LMV, HMV' })}
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Licence Expiry', 'license_expiry', { type: 'date', value: d?.license_expiry || '' })}
-        ${field('Contact Number', 'contact_number', { value: d?.contact_number || '' })}
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Email (for reminders)', 'email', { type: 'email', value: d?.email || '' })}
-        ${field('Safety Score', 'safety_score', { type: 'number', step: '1', value: d?.safety_score ?? 100 })}
-      </div>
-      ${selectField('Status', 'status', DRIVER_STATUSES, d?.status || 'Available')}
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">${d ? 'Save changes' : 'Create driver'}</button>
-    </form>`, (root) => {
-      const scanBtn = root.querySelector('#df-scan');
-      scanBtn.onclick = async () => {
-        const file = root.querySelector('#df-lic').files[0];
-        if (!file) { toast('Choose a licence image first', 'warn'); return; }
-        scanBtn.disabled = true; scanBtn.textContent = 'Scanning… (OCR)';
-        const fd = new FormData(); fd.append('file', file);
-        const res = root.querySelector('#df-scan-result');
-        try {
-          const r = await api('/documents/scan-licence', { method: 'POST', form: fd });
-          if (!r.is_licence) {
-            res.innerHTML = `<span class="text-red-600">⛔ ${esc(r.error || 'Not recognised as a licence.')}</span>`;
-          } else {
-            const f = r.fields, form = root.querySelector('#df');
-            if (f.name) form.name.value = f.name;
-            if (f.license_no) form.license_number.value = f.license_no;
-            if (f.classes && f.classes.length) form.license_category.value = f.classes.join(', ');
-            if (f.validity) form.license_expiry.value = f.validity;
-            res.innerHTML = renderOcr(r);
-            toast('Licence scanned — fields filled in below', 'success');
+    
+    // Compute idle vehicles
+    const idleListHost = document.getElementById("idle-vehicles-list");
+    const idleVehicles = [];
+    const now = new Date();
+    
+    vehicles.forEach(v => {
+      if (v.status === "Available") {
+        const vTrips = trips.filter(t => t.vehicle_id === v.id && t.status === "Completed");
+        if (vTrips.length === 0) {
+          idleVehicles.push({ vehicle: v, days: 99 }); // never dispatched
+        } else {
+          const lastTrip = vTrips.sort((a,b) => new Date(b.completed_at) - new Date(a.completed_at))[0];
+          const diffTime = Math.abs(now - new Date(lastTrip.completed_at));
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 3) {
+            idleVehicles.push({ vehicle: v, days: diffDays });
           }
-        } catch (err) { res.innerHTML = `<span class="text-red-600">${esc(err.message)}</span>`; }
-        finally { scanBtn.disabled = false; scanBtn.textContent = 'Scan & auto-fill'; }
-      };
-      root.querySelector('#df').onsubmit = async (e) => {
-        e.preventDefault();
-        const data = formData(e.target);
-        data.safety_score = parseFloat(data.safety_score || 0);
-        if (!data.license_expiry) delete data.license_expiry;
-        try {
-          if (d) await api(`/drivers/${d.id}`, { method: 'PUT', body: data });
-          else await api('/drivers', { method: 'POST', body: data });
-          toast(d ? 'Driver updated' : 'Driver created', 'success'); closeModal(); load();
-        } catch (err) { toast(err.message, 'error'); }
-      };
+        }
+      }
     });
+    
+    if (idleVehicles.length === 0) {
+      idleListHost.innerHTML = `<div class="empty-state"><p>All active vehicles are running efficiently.</p></div>`;
+    } else {
+      idleListHost.innerHTML = `
+        <table class="text-sm">
+          <thead>
+            <tr><th>Reg Number</th><th>Model</th><th>Idle Time</th></tr>
+          </thead>
+          <tbody>
+            ${idleVehicles.map(item => `
+              <tr>
+                <td><span class="fw-600">${item.vehicle.registration_number}</span></td>
+                <td>${item.vehicle.name}</td>
+                <td><span class="badge badge-amber">${item.days === 99 ? 'Never Dispatched' : item.days + ' days idle'}</span></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+  } catch(e) {}
+}
+
+async function renderTripManagement(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Trip Dispatch & Operations Board</h2>
+        <p class="page-header-sub">Dispatch new trips, monitor active tasks, or reassign drivers</p>
+      </div>
+      <button class="btn btn-primary" id="btn-new-trip">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Trip Dispatch
+      </button>
+    </div>
+    
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn btn-secondary active" id="tab-all-trips">All Trips</button>
+        <button class="btn btn-secondary" id="tab-dispatched-trips">Active</button>
+        <button class="btn btn-secondary" id="tab-draft-trips">Drafts</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table id="trips-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Source / Destination</th>
+              <th>Vehicle</th>
+              <th>Driver</th>
+              <th>Cargo Load</th>
+              <th>Distance / ETA</th>
+              <th>Revenue</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="trips-tbody">
+            <tr><td colspan="9" class="text-muted" style="text-align:center">Loading trips logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  let tripsFilter = "all";
+  
+  async function loadTrips() {
+    try {
+      const trips = await request("/api/trips");
+      const tbody = document.getElementById("trips-tbody");
+      tbody.innerHTML = "";
+      
+      const filtered = trips.filter(t => {
+        if (tripsFilter === "dispatched") return t.status === "Dispatched";
+        if (tripsFilter === "draft") return t.status === "Draft";
+        return true;
+      });
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center" class="text-muted">No trips match this filter.</td></tr>`;
+        return;
+      }
+      
+      filtered.forEach(t => {
+        let statusBadge = "badge-gray";
+        if (t.status === "Completed") statusBadge = "badge-green";
+        else if (t.status === "Dispatched") statusBadge = "badge-blue";
+        else if (t.status === "Cancelled") statusBadge = "badge-red";
+        else if (t.status === "Draft") statusBadge = "badge-amber";
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">TRIP-${t.id}</span></td>
+            <td>
+              <div class="fw-600">${t.source}</div>
+              <div class="text-muted text-sm">➔ ${t.destination}</div>
+            </td>
+            <td>${t.vehicle_name || 'Unassigned'}</td>
+            <td>${t.driver_name || 'Unassigned'}</td>
+            <td>${t.cargo_weight.toLocaleString()} kg</td>
+            <td>
+              <div>${t.planned_distance} km</div>
+              <div class="text-sm text-muted">${t.planned_duration || 0} hrs</div>
+            </td>
+            <td>₹${t.revenue.toLocaleString()}</td>
+            <td><span class="badge ${statusBadge}">${t.status}</span></td>
+            <td class="table-actions">
+              ${t.status === "Draft" ? `
+                <button class="btn btn-secondary btn-sm" onclick="dispatchTrip(${t.id})">Dispatch</button>
+                <button class="btn btn-secondary btn-sm" onclick="editTripModal(${t.id})">Reassign</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteTrip(${t.id})">Delete</button>
+              ` : ""}
+              ${t.status === "Dispatched" ? `
+                <button class="btn btn-secondary btn-sm" onclick="editTripModal(${t.id})">Reassign</button>
+                <button class="btn btn-secondary btn-sm" onclick="cancelTrip(${t.id})">Cancel</button>
+              ` : ""}
+            </td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  document.getElementById("tab-all-trips").addEventListener("click", () => {
+    tripsFilter = "all";
+    loadTrips();
+  });
+  document.getElementById("tab-dispatched-trips").addEventListener("click", () => {
+    tripsFilter = "dispatched";
+    loadTrips();
+  });
+  document.getElementById("tab-draft-trips").addEventListener("click", () => {
+    tripsFilter = "draft";
+    loadTrips();
+  });
+  
+  document.getElementById("btn-new-trip").addEventListener("click", () => showNewTripModal(loadTrips));
+  
+  loadTrips();
+}
+
+window.dispatchTrip = async function(id) {
+  if (confirm("Are you sure you want to dispatch this trip? Both driver and vehicle status will change to On Trip.")) {
+    await request(`/api/trips/${id}/dispatch`, { method: "POST" });
+    showToast("Trip dispatched successfully!");
+    renderPage();
   }
 };
-function scoreBar(score) {
-  const s = Math.max(0, Math.min(100, score || 0));
-  const color = s >= 80 ? 'bg-emerald-500' : s >= 60 ? 'bg-amber-500' : 'bg-red-500';
-  return `<div class="flex items-center gap-2"><div class="w-16 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden"><div class="${color} h-full" style="width:${s}%"></div></div><span class="text-xs">${num(s)}</span></div>`;
-}
 
-async function remindersModal() {
-  openModal('Licence Expiry Reminders', `<div id="rem-body" class="text-sm text-slate-400">Loading due drivers…</div>`, async (root) => {
-    try {
-      const data = await api('/reminders/due');
-      const body = root.querySelector('#rem-body');
-      if (!data.drivers.length) { body.innerHTML = `<p class="text-slate-500">No licences expiring within ${data.window_days} days. ✅</p>`; return; }
-      body.innerHTML = `
-        <p class="mb-3 text-slate-600 dark:text-slate-300">These ${data.drivers.length} driver(s) have a licence expiring within ${data.window_days} days (uses your Gmail sender):</p>
-        <div class="space-y-2 mb-4 max-h-60 overflow-y-auto">${data.drivers.map(d => `
-          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800">
-            <div><div class="font-semibold">${esc(d.name)}</div><div class="text-xs text-slate-400">${esc(d.email || 'no email')}</div></div>
-            <div class="text-right"><div class="${d.expired ? 'text-red-600' : 'text-amber-600'} font-semibold text-sm">${d.expired ? 'EXPIRED' : d.days_left + 'd left'}</div><div class="text-xs text-slate-400">${esc(d.expiry_date)}</div></div>
-          </div>`).join('')}</div>
-        <button id="rem-send" class="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold">Send reminder emails now</button>`;
-      body.querySelector('#rem-send').onclick = async (e) => {
-        e.target.disabled = true; e.target.textContent = 'Sending…';
-        try {
-          const r = await api('/reminders/send', { method: 'POST' });
-          if (r.error) toast(r.error, 'error');
-          else toast(`Sent ${r.sent} of ${r.total} reminder email(s).`, 'success');
-          closeModal();
-        } catch (err) { toast(err.message, 'error'); e.target.disabled = false; e.target.textContent = 'Send reminder emails now'; }
-      };
-    } catch (err) { root.querySelector('#rem-body').innerHTML = `<p class="text-red-600">${esc(err.message)}</p>`; }
-  });
-}
-
-/* ============================ TRIPS ==================================*/
-const TRIP_STATUSES = ['Draft', 'Dispatched', 'Completed', 'Cancelled'];
-PAGES.trips = async function (page) {
-  const actions = can('trips') ? `<button id="add-trip" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">+ Create Trip</button>` : '';
-  page.innerHTML = '';
-  const tb = toolbar({ onSearch: v => load({ search: v }), actions,
-    filters: [{ name: 'status', label: 'All statuses', options: TRIP_STATUSES }] });
-  page.appendChild(tb);
-  const host = document.createElement('div'); page.appendChild(host);
-  tb.querySelectorAll('[data-filter]').forEach(s => s.onchange = () => load());
-  if (can('trips')) tb.querySelector('#add-trip').onclick = () => tripForm();
-
-  async function load(extra = {}) {
-    const q = new URLSearchParams(extra);
-    tb.querySelectorAll('[data-filter]').forEach(s => { if (s.value) q.set(s.dataset.filter, s.value); });
-    const rows = await api('/trips?' + q.toString());
-    host.innerHTML = card(tableShell(['#', 'Route', 'Vehicle', 'Driver', 'Cargo', 'Distance', 'Status', 'Actions']));
-    const tbody = host.querySelector('tbody');
-    if (!rows.length) { tbody.innerHTML = emptyRow(8); return; }
-    tbody.innerHTML = rows.map(t => `<tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-      <td class="px-4 py-3 text-slate-400">#${t.id}</td>
-      <td class="px-4 py-3 font-medium">${esc(t.source)} → ${esc(t.destination)}</td>
-      <td class="px-4 py-3 font-mono text-xs">${esc(t.vehicle_name || '')}</td>
-      <td class="px-4 py-3">${esc(t.driver_name || '')}</td>
-      <td class="px-4 py-3">${num(t.cargo_weight)} kg</td>
-      <td class="px-4 py-3">${num(t.planned_distance)} km</td>
-      <td class="px-4 py-3">${badge(t.status)}</td>
-      <td class="px-4 py-3 text-right whitespace-nowrap" data-actions></td></tr>`).join('');
-    tbody.querySelectorAll('tr').forEach((tr, i) => {
-      const t = rows[i]; const cell = tr.querySelector('[data-actions]'); const btns = [];
-      if (t.status === 'Draft' && can('trips')) {
-        btns.push(['Dispatch', 'bg-blue-600 text-white hover:bg-blue-700', () => act(t.id, 'dispatch')]);
-        btns.push(['Cancel', 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800', () => act(t.id, 'cancel')]);
-      }
-      if (t.status === 'Dispatched') {
-        if (can('trips_complete')) btns.push(['Complete', 'bg-emerald-600 text-white hover:bg-emerald-700', () => completeForm(t)]);
-        if (can('trips')) btns.push(['Cancel', 'text-red-600 hover:bg-red-50', () => act(t.id, 'cancel')]);
-      }
-      if (can('revenue')) btns.push(['₹ Revenue', 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200', () => revenueForm(t)]);
-      cell.innerHTML = btns.length ? btns.map(([l, c]) => `<button class="px-2.5 py-1 rounded-lg text-xs font-medium ${c}">${l}</button>`).join(' ') : '<span class="text-xs text-slate-400">—</span>';
-      cell.querySelectorAll('button').forEach((b, bi) => b.onclick = btns[bi][2]);
-    });
+window.cancelTrip = async function(id) {
+  if (confirm("Are you sure you want to cancel this active trip? Vehicle and driver will be set back to Available.")) {
+    await request(`/api/trips/${id}/cancel`, { method: "POST" });
+    showToast("Trip cancelled successfully.");
+    renderPage();
   }
-  async function act(id, action) { try { await api(`/trips/${id}/${action}`, { method: 'POST' }); toast(`Trip ${action}ed`, 'success'); load(); } catch (e) { toast(e.message, 'error'); } }
-  load();
+};
 
-  async function tripForm() {
-    const [vehicles, drivers] = await Promise.all([api('/vehicles/dispatchable'), api('/drivers/dispatchable')]);
-    if (!vehicles.length || !drivers.length) {
-      openModal('Create Trip', `<p class="text-slate-500">You need at least one <b>available vehicle</b> and one <b>eligible driver</b> to create a trip.<br><br>${!vehicles.length ? '⚠️ No dispatchable vehicles (all On Trip / In Shop / Retired).<br>' : ''}${!drivers.length ? '⚠️ No dispatchable drivers (all On Trip / Suspended / expired licence).' : ''}</p>`);
+window.deleteTrip = async function(id) {
+  if (confirm("Are you sure you want to delete this trip record?")) {
+    await request(`/api/trips/${id}`, { method: "DELETE" });
+    showToast("Trip deleted.");
+    renderPage();
+  }
+};
+
+window.editTripModal = async function(id) {
+  try {
+    const trip = await request(`/api/trips/${id}`);
+    const vehicles = await request("/api/vehicles");
+    const drivers = await request("/api/drivers");
+    
+    // For vehicle dropdown: allow currently assigned vehicle OR any available vehicle
+    const eligibleVehicles = vehicles.filter(v => v.status === "Available" || v.id === trip.vehicle_id);
+    // For driver dropdown: allow currently assigned driver OR any available non-expired driver
+    const eligibleDrivers = drivers.filter(d => (d.status === "Available" && !d.license_expired) || d.id === trip.driver_id);
+    
+    const isDraft = trip.status === "Draft";
+    
+    const bodyHtml = `
+      <form id="edit-trip-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Source Location</label>
+            <input id="et-source" type="text" class="form-control" value="${trip.source}" ${isDraft ? '' : 'disabled'} required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Destination Location</label>
+            <input id="et-destination" type="text" class="form-control" value="${trip.destination}" ${isDraft ? '' : 'disabled'} required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cargo Weight (kg)</label>
+            <input id="et-cargo" type="number" class="form-control" value="${trip.cargo_weight}" ${isDraft ? '' : 'disabled'} required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Planned Distance (km)</label>
+            <input id="et-distance" type="number" class="form-control" value="${trip.planned_distance}" ${isDraft ? '' : 'disabled'} required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Planned Duration (hrs)</label>
+            <input id="et-duration" type="number" step="0.1" class="form-control" value="${trip.planned_duration || 0}" ${isDraft ? '' : 'disabled'} required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Revenue (₹)</label>
+            <input id="et-revenue" type="number" class="form-control" value="${trip.revenue}" required>
+          </div>
+        </div>
+        
+        ${isDraft ? `
+        <div style="margin: 16px 0; padding: 12px; background:var(--c-bg); border-radius:var(--radius); display:flex; align-items:center; justify-content:space-between">
+          <div>
+            <div class="fw-600 text-sm">Smart Suggestion Algorithm</div>
+            <div class="text-muted text-sm">Finds the optimal vehicle and driver match</div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-edit-suggest">Run Suggestion</button>
+        </div>
+        ` : ''}
+        
+        <div class="form-group">
+          <label class="form-label">Assigned Vehicle</label>
+          <select id="et-vehicle" class="form-control" required>
+            ${eligibleVehicles.map(v => `<option value="${v.id}" ${v.id === trip.vehicle_id ? 'selected' : ''}>${v.registration_number} (${v.name} - max ${v.max_load_capacity}kg) ${v.id === trip.vehicle_id ? '[CURRENT]' : ''}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assigned Driver</label>
+          <select id="et-driver" class="form-control" required>
+            ${eligibleDrivers.map(d => `<option value="${d.id}" ${d.id === trip.driver_id ? 'selected' : ''}>${d.name} (${d.license_category}) ${d.id === trip.driver_id ? '[CURRENT]' : ''}</option>`).join("")}
+          </select>
+        </div>
+      </form>
+    `;
+    
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-trip-edit">Save Changes</button>
+    `;
+    
+    showModal(`Reassign Trip - TRIP-${trip.id}`, bodyHtml, footerHtml);
+    
+    if (isDraft) {
+      document.getElementById("btn-edit-suggest").addEventListener("click", async () => {
+        const cargo = document.getElementById("et-cargo").value;
+        if (!cargo) {
+          showToast("Please enter cargo weight to calculate suggestions.", "error");
+          return;
+        }
+        const res = await request("/api/trips/suggest", {
+          method: "POST",
+          body: JSON.stringify({ cargo_weight: parseFloat(cargo) })
+        });
+        if (res && res.vehicle_id && res.driver_id) {
+          document.getElementById("et-vehicle").value = res.vehicle_id;
+          document.getElementById("et-driver").value = res.driver_id;
+          showToast(`Suggested: ${res.vehicle_name} & ${res.driver_name} (Score: ${Math.round(res.score * 100)}%)`);
+        } else {
+          showToast("No eligible vehicle/driver match found for this load capacity.", "error");
+        }
+      });
+    }
+    
+    document.getElementById("btn-save-trip-edit").addEventListener("click", async () => {
+      const body = {
+        vehicle_id: parseInt(document.getElementById("et-vehicle").value),
+        driver_id: parseInt(document.getElementById("et-driver").value),
+        revenue: parseFloat(document.getElementById("et-revenue").value || 0)
+      };
+      if (isDraft) {
+        body.source = document.getElementById("et-source").value;
+        body.destination = document.getElementById("et-destination").value;
+        body.cargo_weight = parseFloat(document.getElementById("et-cargo").value);
+        body.planned_distance = parseFloat(document.getElementById("et-distance").value);
+        body.planned_duration = parseFloat(document.getElementById("et-duration").value);
+      }
+      
+      await request(`/api/trips/${trip.id}`, {
+        method: "PUT",
+        body: JSON.stringify(body)
+      });
+      showToast("Trip updated & reassigned successfully!");
+      closeModal();
+      renderPage();
+    });
+  } catch(e) {}
+};
+
+async function showNewTripModal(callback) {
+  try {
+    const vehicles = await request("/api/vehicles");
+    const drivers = await request("/api/drivers");
+    
+    const availVehicles = vehicles.filter(v => v.status === "Available");
+    const availDrivers = drivers.filter(d => d.status === "Available" && !d.license_expired);
+    
+    const bodyHtml = `
+      <form id="new-trip-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Source Location</label>
+            <input id="t-source" type="text" class="form-control" placeholder="Origin" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Destination Location</label>
+            <input id="t-destination" type="text" class="form-control" placeholder="Destination" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cargo Weight (kg)</label>
+            <input id="t-cargo" type="number" class="form-control" value="100" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Planned Distance (km)</label>
+            <input id="t-distance" type="number" class="form-control" value="100" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Planned Duration (hrs)</label>
+            <input id="t-duration" type="number" step="0.1" class="form-control" value="3.5" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Suggested Revenue (₹)</label>
+            <div style="display:flex; gap:6px">
+              <input id="t-revenue" type="number" class="form-control" required>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-calc-rev">Suggest</button>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin: 16px 0; padding: 12px; background:var(--c-bg); border-radius:var(--radius); display:flex; align-items:center; justify-content:space-between">
+          <div>
+            <div class="fw-600 text-sm">Smart Suggestion Algorithm</div>
+            <div class="text-muted text-sm">Finds the optimal vehicle and driver match</div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-smart-suggest">Run Suggestion</button>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Select Vehicle</label>
+          <select id="t-vehicle" class="form-control" required>
+            <option value="">-- Choose Available Vehicle --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Select Driver</label>
+          <select id="t-driver" class="form-control" required>
+            <option value="">-- Choose Available Driver --</option>
+            ${availDrivers.map(d => `<option value="${d.id}">${d.name} (${d.license_category})</option>`).join("")}
+          </select>
+        </div>
+      </form>
+    `;
+    
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-trip">Create Draft</button>
+    `;
+    
+    showModal("Create New Dispatch", bodyHtml, footerHtml);
+    
+    // Revenue suggestion action
+    document.getElementById("btn-calc-rev").addEventListener("click", async () => {
+      const dist = document.getElementById("t-distance").value;
+      const cargo = document.getElementById("t-cargo").value;
+      if (!dist || !cargo) {
+        showToast("Please enter cargo weight and distance first.", "error");
+        return;
+      }
+      const data = await request(`/api/reports/suggest-revenue?distance=${dist}&cargo=${cargo}`);
+      document.getElementById("t-revenue").value = data.suggested_revenue;
+      showToast("Dynamic revenue computed!");
+    });
+    
+    // Smart suggestion action
+    document.getElementById("btn-smart-suggest").addEventListener("click", async () => {
+      const cargo = document.getElementById("t-cargo").value;
+      if (!cargo) {
+        showToast("Please enter cargo weight to calculate suggestions.", "error");
+        return;
+      }
+      const res = await request("/api/trips/suggest", {
+        method: "POST",
+        body: JSON.stringify({ cargo_weight: parseFloat(cargo) })
+      });
+      if (res && res.vehicle_id && res.driver_id) {
+        document.getElementById("t-vehicle").value = res.vehicle_id;
+        document.getElementById("t-driver").value = res.driver_id;
+        showToast(`Suggested: ${res.vehicle_name} & ${res.driver_name} (Score: ${Math.round(res.score * 100)}%)`);
+      } else {
+        showToast("No eligible vehicle/driver match found for this load capacity.", "error");
+      }
+    });
+    
+    // Form Submit
+    document.getElementById("btn-submit-trip").addEventListener("click", async () => {
+      const body = {
+        source: document.getElementById("t-source").value,
+        destination: document.getElementById("t-destination").value,
+        vehicle_id: parseInt(document.getElementById("t-vehicle").value),
+        driver_id: parseInt(document.getElementById("t-driver").value),
+        cargo_weight: parseFloat(document.getElementById("t-cargo").value),
+        planned_distance: parseFloat(document.getElementById("t-distance").value),
+        planned_duration: parseFloat(document.getElementById("t-duration").value),
+        revenue: parseFloat(document.getElementById("t-revenue").value || 0)
+      };
+      
+      if (!body.source || !body.destination || !body.vehicle_id || !body.driver_id) {
+        showToast("Please complete all form inputs.", "error");
+        return;
+      }
+      
+      await request("/api/trips", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      showToast("Draft trip created successfully!");
+      closeModal();
+      callback();
+    });
+
+    // Handle vehicle dropdown dynamic filtering based on cargo
+    const updateVehicleDropdown = () => {
+        const cargo = parseFloat(document.getElementById("t-cargo").value || 0);
+        const vSelect = document.getElementById("t-vehicle");
+        const currentVal = vSelect.value;
+        const validVehicles = availVehicles.filter(v => v.max_load_capacity >= cargo);
+        vSelect.innerHTML = '<option value="">-- Choose Available Vehicle --</option>' + 
+            validVehicles.map(v => `<option value="${v.id}">${v.registration_number} (${v.name} - max ${v.max_load_capacity}kg)</option>`).join("");
+        if (validVehicles.find(v => v.id == currentVal)) {
+            vSelect.value = currentVal;
+        }
+    };
+    document.getElementById("t-cargo").addEventListener("input", updateVehicleDropdown);
+    updateVehicleDropdown();
+    
+  } catch(e) {}
+}
+
+async function renderVehicleRegistry(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Master Vehicle Registry</h2>
+        <p class="page-header-sub">Manage fleet assets, configurations, and active statuses</p>
+      </div>
+      <button class="btn btn-primary" id="btn-add-vehicle">Add Vehicle</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reg Number</th>
+              <th>Model Name</th>
+              <th>Type</th>
+              <th>Capacity</th>
+              <th>Current Odometer</th>
+              <th>Acquisition Cost</th>
+              <th>Health Score</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="vehicles-tbody">
+            <tr><td colspan="8" style="text-align:center" class="text-muted">Loading fleet list...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadVehicles() {
+    try {
+      const vehicles = await request("/api/vehicles");
+      const ratings = await request("/api/ratings/vehicles");
+      const tbody = document.getElementById("vehicles-tbody");
+      tbody.innerHTML = "";
+      
+      vehicles.forEach(v => {
+        const rating = ratings.find(r => r.vehicle_id === v.id);
+        const starsHtml = rating ? renderStars(rating.stars, rating.band) : 'Not Rated';
+        
+        let statusBadge = "badge-gray";
+        if (v.status === "Available") statusBadge = "badge-green";
+        else if (v.status === "On Trip") statusBadge = "badge-blue";
+        else if (v.status === "In Shop") statusBadge = "badge-amber";
+        else if (v.status === "Retired") statusBadge = "badge-red";
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">${v.registration_number}</span></td>
+            <td>${v.name}</td>
+            <td>${v.type}</td>
+            <td>${v.max_load_capacity.toLocaleString()} kg</td>
+            <td>${v.odometer.toLocaleString()} km</td>
+            <td>₹${v.acquisition_cost.toLocaleString()}</td>
+            <td>${starsHtml}</td>
+            <td><span class="badge ${statusBadge}">${v.status}</span></td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  document.getElementById("btn-add-vehicle").addEventListener("click", () => {
+    const bodyHtml = `
+      <form id="new-vehicle-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Registration Number</label>
+            <input id="v-reg" type="text" class="form-control" placeholder="Plate number" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Model/Name</label>
+            <input id="v-name" type="text" class="form-control" placeholder="Model name" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Vehicle Type</label>
+            <select id="v-type" class="form-control" required>
+              <option value="Van">Van</option>
+              <option value="Truck">Truck</option>
+              <option value="Car">Car</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Load Capacity (kg)</label>
+            <input id="v-capacity" type="number" class="form-control" value="1000" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Current Odometer (km)</label>
+            <input id="v-odo" type="number" class="form-control" value="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Acquisition Cost (₹)</label>
+            <input id="v-cost" type="number" class="form-control" value="500000" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Service Interval (km)</label>
+            <input id="v-interval" type="number" class="form-control" value="10000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Acquisition Date</label>
+            <input id="v-acqdate" type="date" class="form-control" required>
+          </div>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-vehicle">Save Vehicle</button>
+    `;
+    showModal("Register New Fleet Asset", bodyHtml, footerHtml);
+    
+    document.getElementById("btn-submit-vehicle").addEventListener("click", async () => {
+      const body = {
+        registration_number: document.getElementById("v-reg").value,
+        name: document.getElementById("v-name").value,
+        type: document.getElementById("v-type").value,
+        max_load_capacity: parseFloat(document.getElementById("v-capacity").value),
+        odometer: parseFloat(document.getElementById("v-odo").value),
+        acquisition_cost: parseFloat(document.getElementById("v-cost").value),
+        service_interval_km: parseFloat(document.getElementById("v-interval").value),
+        acquisition_date: document.getElementById("v-acqdate").value || null,
+        status: "Available"
+      };
+      
+      await request("/api/vehicles", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      showToast("Vehicle registered successfully!");
+      closeModal();
+      loadVehicles();
+    });
+  });
+  
+  loadVehicles();
+}
+
+async function renderMaintenanceLogs(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Preventive & Corrective Maintenance</h2>
+        <p class="page-header-sub">Log repairs and manage vehicle shop status</p>
+      </div>
+      <button class="btn btn-primary" id="btn-log-maint">New Maintenance Entry</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Vehicle</th>
+              <th>Service Type</th>
+              <th>Description</th>
+              <th>Cost</th>
+              <th>Classification</th>
+              <th>Expected Return</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="maint-tbody">
+            <tr><td colspan="9" style="text-align:center" class="text-muted">Loading maintenance dashboard...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadLogs() {
+    try {
+      const logs = await request("/api/maintenance");
+      const tbody = document.getElementById("maint-tbody");
+      tbody.innerHTML = "";
+      
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center" class="text-muted">No maintenance logs found.</td></tr>`;
+        return;
+      }
+      
+      logs.forEach(l => {
+        let statusBadge = l.status === "Open" ? "badge-amber" : "badge-green";
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">MNT-${l.id}</span></td>
+            <td>${l.vehicle_name}</td>
+            <td><span class="fw-600">${l.service_type}</span></td>
+            <td>${l.description || 'No notes'}</td>
+            <td>₹${l.cost.toLocaleString()}</td>
+            <td><span class="badge ${l.is_planned ? 'badge-blue' : 'badge-red'}">${l.is_planned ? 'Planned' : 'Unplanned'}</span></td>
+            <td>${l.expected_completion_date || 'N/A'}</td>
+            <td><span class="badge ${statusBadge}">${l.status}</span></td>
+            <td class="table-actions">
+              ${l.status === "Open" ? `<button class="btn btn-secondary btn-sm" onclick="closeMaint(${l.id})">Close Record</button>` : 'Closed'}
+            </td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  document.getElementById("btn-log-maint").addEventListener("click", async () => {
+    const vehicles = await request("/api/vehicles");
+    const activeVehicles = vehicles.filter(v => v.status !== "Retired");
+    
+    const bodyHtml = `
+      <form id="new-maint-form">
+        <div class="form-group">
+          <label class="form-label">Select Vehicle</label>
+          <select id="m-vehicle" class="form-control" required>
+            ${activeVehicles.map(v => `<option value="${v.id}">${v.registration_number} (${v.name})</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Service Type</label>
+          <input id="m-type" type="text" class="form-control" placeholder="e.g. Oil Change, Clutch Fix" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description / Symptoms</label>
+          <textarea id="m-desc" class="form-control" rows="2" placeholder="Details..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Estimated Cost (₹)</label>
+            <input id="m-cost" type="number" class="form-control" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Service Nature</label>
+            <select id="m-planned" class="form-control">
+              <option value="true">Routine Planned Service</option>
+              <option value="false">Unplanned Breakdown / Repair</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expected Completion Date</label>
+          <input id="m-eta" type="date" class="form-control" required>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-maint">Put in Shop</button>
+    `;
+    showModal("Create Maintenance Record", bodyHtml, footerHtml);
+    
+    document.getElementById("btn-submit-maint").addEventListener("click", async () => {
+      const body = {
+        vehicle_id: parseInt(document.getElementById("m-vehicle").value),
+        service_type: document.getElementById("m-type").value,
+        description: document.getElementById("m-desc").value,
+        cost: parseFloat(document.getElementById("m-cost").value || 0),
+        is_planned: document.getElementById("m-planned").value === "true",
+        expected_completion_date: document.getElementById("m-eta").value || null
+      };
+      
+      await request("/api/maintenance", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      showToast("Vehicle has been moved to Shop.");
+      closeModal();
+      loadLogs();
+    });
+  });
+  
+  loadLogs();
+}
+
+window.closeMaint = async function(id) {
+  if (confirm("Are you sure you want to close this record? Vehicle status will be set back to Available.")) {
+    await request(`/api/maintenance/${id}/close`, { method: "POST" });
+    showToast("Maintenance record closed successfully.");
+    renderPage();
+  }
+};
+
+async function renderVehicleDocuments(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Document Expiry Tracker</h2>
+        <p class="page-header-sub">Monitor permits, registrations, and insurance deadlines</p>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Document Type</th>
+              <th>Document Number</th>
+              <th>Expiry Date</th>
+              <th>Days Left</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="docs-tbody">
+            <tr><td colspan="6" style="text-align:center" class="text-muted">Analyzing documents expiry dates...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  try {
+    const docs = await request("/api/documents");
+    const tbody = document.getElementById("docs-tbody");
+    tbody.innerHTML = "";
+    
+    const vDocs = docs.filter(d => d.vehicle_id !== null);
+    if (vDocs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center" class="text-muted">No vehicle documents registered.</td></tr>`;
       return;
     }
-    openModal('Create Trip', `<form id="tf" class="space-y-3">
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Source', 'source', { required: true, placeholder: 'Chennai' })}
-        ${field('Destination', 'destination', { required: true, placeholder: 'Madurai' })}
-      </div>
-      <div class="grid grid-cols-3 gap-3">
-        ${field('Cargo (kg)', 'cargo_weight', { type: 'number', step: '1', value: 0 })}
-        ${field('Distance (km)', 'planned_distance', { type: 'number', step: '1', value: 0 })}
-        ${field('Duration (hrs)', 'planned_duration', { type: 'number', step: '0.5', value: 0 })}
-      </div>
-      <div class="p-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-slate-800">
-        <button type="button" id="tf-suggest" class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">✨ Suggest best vehicle + driver</button>
-        <p id="tf-suggest-result" class="text-xs text-slate-500 dark:text-slate-400 mt-2">Ranks eligible options by capacity fit, driver safety, maintenance risk, fair rotation &amp; idle time.</p>
-      </div>
-      ${selectField('Vehicle (available only)', 'vehicle_id', vehicles.map(v => ({ value: v.id, label: `${v.registration_number} — ${v.name} (max ${v.max_load_capacity}kg)` })))}
-      ${selectField('Driver (eligible only)', 'driver_id', drivers.map(d => ({ value: d.id, label: `${d.name} — ${d.license_category || 'licence'}` })))}
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Revenue', 'revenue', { type: 'number', step: '1', value: 0 })}
-        <div class="flex items-end"><button type="button" id="tf-rev" class="w-full py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-sm font-medium">💡 Suggest revenue</button></div>
-      </div>
-      <p class="text-xs text-slate-400">Cargo must not exceed the selected vehicle's capacity — the server enforces this.</p>
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">Create draft trip</button>
-    </form>`, (root) => {
-      const form = root.querySelector('#tf');
-      root.querySelector('#tf-suggest').onclick = async () => {
-        const cargo = parseFloat(form.cargo_weight.value || 0);
-        try {
-          const r = await api('/trips/suggest', { method: 'POST', body: { cargo_weight: cargo, vehicle_type: null } });
-          const box = root.querySelector('#tf-suggest-result');
-          if (!r.best) { box.innerHTML = '<span class="text-amber-600">⚠️ No eligible vehicle+driver for that cargo weight.</span>'; return; }
-          form.vehicle_id.value = r.best.vehicle_id;
-          form.driver_id.value = r.best.driver_id;
-          box.innerHTML = `✅ Suggested <b>${esc(r.best.vehicle)}</b> + <b>${esc(r.best.driver)}</b> — score ${r.best.score}
-            <span class="text-slate-400">(fit ${r.best.capacity_fit}, safety ${r.best.safety}, maint ${r.best.maintenance_risk})</span>`;
-          toast('Best match pre-selected', 'success');
-        } catch (err) { toast(err.message, 'error'); }
-      };
-      root.querySelector('#tf-rev').onclick = async () => {
-        const dist = parseFloat(form.planned_distance.value || 0);
-        const cargo = parseFloat(form.cargo_weight.value || 0);
-        if (!dist || !cargo) { toast('Enter cargo + distance first', 'warn'); return; }
-        try {
-          const r = await api(`/reports/suggest-revenue?distance=${dist}&cargo=${cargo}`);
-          form.revenue.value = r.suggested_revenue;
-          toast(`Suggested ₹${r.suggested_revenue} (${r.basis})`, 'info');
-        } catch (err) { toast(err.message, 'error'); }
-      };
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const d = formData(e.target);
-        ['vehicle_id', 'driver_id'].forEach(k => d[k] = parseInt(d[k]));
-        ['cargo_weight', 'planned_distance', 'planned_duration', 'revenue'].forEach(k => d[k] = parseFloat(d[k] || 0));
-        try { await api('/trips', { method: 'POST', body: d }); toast('Trip created (Draft)', 'success'); closeModal(); load(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
+    
+    const now = new Date();
+    vDocs.forEach(d => {
+      const exp = new Date(d.expiry_date);
+      const diffTime = exp - now;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let statusBadge = "badge-green";
+      let statusText = "Valid";
+      
+      if (diffDays < 0) {
+        statusBadge = "badge-red";
+        statusText = "Expired";
+      } else if (diffDays <= 30) {
+        statusBadge = "badge-amber";
+        statusText = "Expiring Soon";
+      }
+      
+      tbody.innerHTML += `
+        <tr>
+          <td><span class="fw-600">${d.vehicle_name}</span></td>
+          <td>${d.doc_type}</td>
+          <td>${d.document_number || 'N/A'}</td>
+          <td>${d.expiry_date}</td>
+          <td><span class="fw-600">${diffDays < 0 ? 'Expired' : diffDays + ' days left'}</span></td>
+          <td><span class="badge ${statusBadge}">${statusText}</span></td>
+        </tr>
+      `;
     });
-  }
-
-  function completeForm(t) {
-    openModal(`Complete Trip #${t.id}`, `<form id="cf" class="space-y-3">
-      <p class="text-sm text-slate-500">Enter the final odometer and fuel consumed. Vehicle & driver return to Available.</p>
-      ${field('Final Odometer (km)', 'final_odometer', { type: 'number', step: '1', required: true })}
-      ${field('Fuel Consumed (litres)', 'fuel_consumed', { type: 'number', step: '0.1', required: true })}
-      ${field('Revenue (optional)', 'revenue', { type: 'number', step: '1', value: t.revenue || 0 })}
-      <button class="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Complete trip</button>
-    </form>`, (root) => {
-      root.querySelector('#cf').onsubmit = async (e) => {
-        e.preventDefault();
-        const d = formData(e.target);
-        ['final_odometer', 'fuel_consumed', 'revenue'].forEach(k => d[k] = parseFloat(d[k] || 0));
-        try { await api(`/trips/${t.id}/complete`, { method: 'POST', body: d }); toast('Trip completed', 'success'); closeModal(); load(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
-    });
-  }
-
-  function revenueForm(t) {
-    openModal(`Set Revenue — Trip #${t.id}`, `<form id="rf" class="space-y-3">
-      <p class="text-sm text-slate-500">Revenue feeds the Net Profit &amp; Vehicle ROI figures.</p>
-      ${field('Revenue (₹)', 'revenue', { type: 'number', step: '1', value: t.revenue || 0, required: true })}
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">Save revenue</button>
-    </form>`, (root) => {
-      root.querySelector('#rf').onsubmit = async (e) => {
-        e.preventDefault();
-        const revenue = parseFloat(formData(e.target).revenue || 0);
-        try { await api(`/trips/${t.id}/revenue`, { method: 'PUT', body: { revenue } }); toast('Revenue updated', 'success'); closeModal(); load(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
-    });
-  }
-};
-
-/* ============================ MAINTENANCE ============================*/
-PAGES.maintenance = async function (page) {
-  const actions = can('maintenance') ? `<button id="add-m" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">+ Log Maintenance</button>` : '';
-  page.innerHTML = '';
-  const tb = toolbar({ search: false, actions, filters: [{ name: 'status', label: 'All statuses', options: ['Open', 'Closed'] }] });
-  page.appendChild(tb);
-  const host = document.createElement('div'); page.appendChild(host);
-  tb.querySelectorAll('[data-filter]').forEach(s => s.onchange = () => load());
-  if (can('maintenance')) tb.querySelector('#add-m').onclick = () => mForm();
-
-  async function load() {
-    const q = new URLSearchParams();
-    tb.querySelectorAll('[data-filter]').forEach(s => { if (s.value) q.set(s.dataset.filter, s.value); });
-    const rows = await api('/maintenance?' + q.toString());
-    host.innerHTML = card(tableShell(['Vehicle', 'Service', 'Description', 'Cost', 'Date', 'Status', '']));
-    const tbody = host.querySelector('tbody');
-    if (!rows.length) { tbody.innerHTML = emptyRow(7); return; }
-    tbody.innerHTML = rows.map(m => `<tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-      <td class="px-4 py-3 font-mono text-xs font-semibold">${esc(m.vehicle_name || '')}</td>
-      <td class="px-4 py-3 font-medium">${esc(m.service_type)}</td>
-      <td class="px-4 py-3 text-slate-500">${esc(m.description || '—')}</td>
-      <td class="px-4 py-3">${money(m.cost)}</td>
-      <td class="px-4 py-3">${esc(m.service_date || '')}</td>
-      <td class="px-4 py-3">${badge(m.status)}</td>
-      <td class="px-4 py-3 text-right">${(can('maintenance') && m.status === 'Open') ? actionBtn('Close ✔', 'bg-emerald-600 text-white hover:bg-emerald-700') : ''}</td></tr>`).join('');
-    if (can('maintenance')) tbody.querySelectorAll('tr').forEach((tr, i) => {
-      const b = tr.querySelector('button'); if (b) b.onclick = async () => { try { await api(`/maintenance/${rows[i].id}/close`, { method: 'POST' }); toast('Maintenance closed — vehicle restored', 'success'); load(); } catch (e) { toast(e.message, 'error'); } };
-    });
-  }
-  load();
-
-  async function mForm() {
-    const vehicles = (await api('/vehicles')).filter(v => v.status !== 'Retired');
-    openModal('Log Maintenance', `<form id="mf" class="space-y-3">
-      <p class="text-sm text-slate-500">Opening a record moves the vehicle to <b>In Shop</b> and hides it from dispatch.</p>
-      ${selectField('Vehicle', 'vehicle_id', vehicles.map(v => ({ value: v.id, label: `${v.registration_number} — ${v.name} (${v.status})` })))}
-      ${field('Service Type', 'service_type', { required: true, placeholder: 'Oil Change' })}
-      ${field('Description', 'description', {})}
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Cost', 'cost', { type: 'number', step: '1', value: 0 })}
-        ${selectField('Type', 'is_planned', [{ value: 'true', label: 'Planned service' }, { value: 'false', label: 'Unplanned repair' }], 'true')}
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Service Date', 'service_date', { type: 'date' })}
-        ${field('Expected Return (ETA)', 'expected_completion_date', { type: 'date' })}
-      </div>
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">Create record</button>
-    </form>`, (root) => {
-      root.querySelector('#mf').onsubmit = async (e) => {
-        e.preventDefault();
-        const d = formData(e.target); d.vehicle_id = parseInt(d.vehicle_id); d.cost = parseFloat(d.cost || 0);
-        d.is_planned = d.is_planned === 'true';
-        if (!d.service_date) delete d.service_date;
-        if (!d.expected_completion_date) delete d.expected_completion_date;
-        try { await api('/maintenance', { method: 'POST', body: d }); toast('Maintenance logged — vehicle In Shop', 'success'); closeModal(); load(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
-    });
-  }
-};
-
-/* ============================ FUEL & EXPENSES ========================*/
-PAGES.fuel = async function (page) {
-  page.innerHTML = `
-    <div class="flex flex-wrap gap-2 mb-4">
-      ${can('fuel') ? `<button id="add-fuel" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">+ Fuel Log</button>` : ''}
-      ${can('expenses') ? `<button id="add-exp" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold">+ Expense</button>` : ''}
-    </div>
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-      <div><h3 class="font-bold mb-2">⛽ Fuel Logs</h3><div id="fuel-host"></div></div>
-      <div><h3 class="font-bold mb-2">🧾 Expenses (tolls, misc)</h3><div id="exp-host"></div></div>
-    </div>`;
-  if (can('fuel')) $('#add-fuel').onclick = fuelForm;
-  if (can('expenses')) $('#add-exp').onclick = expForm;
-
-  async function loadFuel() {
-    const rows = await api('/fuel');
-    $('#fuel-host').innerHTML = card(tableShell(['Vehicle', 'Litres', 'Cost', 'Odometer', 'Date', '']));
-    const tb = $('#fuel-host tbody');
-    tb.innerHTML = rows.length ? rows.map(f => `<tr class="border-b border-slate-100 dark:border-slate-800">
-      <td class="px-4 py-2.5 font-mono text-xs font-semibold">${esc(f.vehicle_name || '')}</td>
-      <td class="px-4 py-2.5">${num(f.liters)} L</td>
-      <td class="px-4 py-2.5">${money(f.cost)}</td>
-      <td class="px-4 py-2.5">${f.odometer ? num(f.odometer) + ' km' : '—'}</td>
-      <td class="px-4 py-2.5">${esc(f.log_date || '')}</td>
-      <td class="px-4 py-2.5 text-right">${can('fuel') ? actionBtn('✕', 'text-red-600 hover:bg-red-50') : ''}</td></tr>`).join('') : emptyRow(6);
-    if (can('fuel')) tb.querySelectorAll('button').forEach((b, i) => b.onclick = () => confirmDelete('this fuel log', async () => { await api(`/fuel/${rows[i].id}`, { method: 'DELETE' }); toast('Deleted', 'success'); loadFuel(); }));
-  }
-  async function loadExp() {
-    const rows = await api('/expenses');
-    $('#exp-host').innerHTML = card(tableShell(['Vehicle', 'Category', 'Amount', 'Description', 'Date', '']));
-    const tb = $('#exp-host tbody');
-    tb.innerHTML = rows.length ? rows.map(x => `<tr class="border-b border-slate-100 dark:border-slate-800">
-      <td class="px-4 py-2.5 font-mono text-xs font-semibold">${esc(x.vehicle_name || '—')}</td>
-      <td class="px-4 py-2.5">${badge(x.category)}</td>
-      <td class="px-4 py-2.5">${money(x.amount)}</td>
-      <td class="px-4 py-2.5 text-slate-500">${esc(x.description || '—')}</td>
-      <td class="px-4 py-2.5">${esc(x.expense_date || '')}</td>
-      <td class="px-4 py-2.5 text-right">${can('expenses') ? actionBtn('✕', 'text-red-600 hover:bg-red-50') : ''}</td></tr>`).join('') : emptyRow(6);
-    if (can('expenses')) tb.querySelectorAll('button').forEach((b, i) => b.onclick = () => confirmDelete('this expense', async () => { await api(`/expenses/${rows[i].id}`, { method: 'DELETE' }); toast('Deleted', 'success'); loadExp(); }));
-  }
-  loadFuel(); loadExp();
-
-  async function fuelForm() {
-    const vehicles = await api('/vehicles');
-    openModal('Add Fuel Log', `<form id="ff" class="space-y-3">
-      ${selectField('Vehicle', 'vehicle_id', vehicles.map(v => ({ value: v.id, label: v.registration_number + ' — ' + v.name })))}
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Litres', 'liters', { type: 'number', step: '0.1', required: true })}
-        ${field('Cost', 'cost', { type: 'number', step: '1', value: 0 })}
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Odometer (km)', 'odometer', { type: 'number', step: '1' })}
-        ${field('Date', 'log_date', { type: 'date' })}
-      </div>
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">Save fuel log</button>
-    </form>`, (root) => {
-      root.querySelector('#ff').onsubmit = async (e) => {
-        e.preventDefault(); const d = formData(e.target);
-        d.vehicle_id = parseInt(d.vehicle_id); ['liters', 'cost', 'odometer'].forEach(k => d[k] = d[k] ? parseFloat(d[k]) : null);
-        if (!d.log_date) delete d.log_date; if (d.odometer === null) delete d.odometer;
-        try { await api('/fuel', { method: 'POST', body: d }); toast('Fuel log added', 'success'); closeModal(); loadFuel(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
-    });
-  }
-  async function expForm() {
-    const vehicles = await api('/vehicles');
-    openModal('Add Expense', `<form id="ef" class="space-y-3">
-      ${selectField('Vehicle (optional)', 'vehicle_id', [{ value: '', label: '— none —' }].concat(vehicles.map(v => ({ value: v.id, label: v.registration_number }))))}
-      ${selectField('Category', 'category', ['Toll', 'Fine', 'Parking', 'Other'], 'Toll')}
-      <div class="grid grid-cols-2 gap-3">
-        ${field('Amount', 'amount', { type: 'number', step: '1', required: true })}
-        ${field('Date', 'expense_date', { type: 'date' })}
-      </div>
-      ${field('Description', 'description', {})}
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">Save expense</button>
-    </form>`, (root) => {
-      root.querySelector('#ef').onsubmit = async (e) => {
-        e.preventDefault(); const d = formData(e.target);
-        d.amount = parseFloat(d.amount || 0); d.vehicle_id = d.vehicle_id ? parseInt(d.vehicle_id) : null;
-        if (!d.vehicle_id) delete d.vehicle_id; if (!d.expense_date) delete d.expense_date;
-        try { await api('/expenses', { method: 'POST', body: d }); toast('Expense added', 'success'); closeModal(); loadExp(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
-    });
-  }
-};
-
-/* ============================ DOCUMENTS / OCR ========================*/
-PAGES.documents = async function (page) {
-  page.innerHTML = `
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      ${card(`<div class="p-5">
-        <h3 class="font-bold mb-1">🪪 Verify a Driving Licence (OCR)</h3>
-        <p class="text-sm text-slate-500 mb-4">Upload a licence image — your OCR pipeline extracts the fields and runs the Tier-2 authenticity checks.</p>
-        <input id="scan-file" type="file" accept="image/*" class="block w-full text-sm mb-3
-          file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white hover:file:bg-brand-700">
-        <button id="scan-btn" class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-50">Scan licence</button>
-        <div id="scan-result" class="mt-4"></div>
-      </div>`)}
-      ${card(`<div class="p-5">
-        <h3 class="font-bold mb-1">📎 Attach Document to Driver / Vehicle</h3>
-        <p class="text-sm text-slate-500 mb-4">Store RC, insurance or a licence. Licences are auto-OCR'd and can back-fill the driver's details.</p>
-        <div id="upload-host">${can('documents') ? '' : '<p class="text-sm text-amber-600">Your role can view documents but not upload.</p>'}</div>
-      </div>`)}
-    </div>
-    <h3 class="font-bold mt-6 mb-2">Stored Documents</h3>
-    <div id="docs-host"></div>`;
-
-  $('#scan-btn').onclick = async () => {
-    const f = $('#scan-file').files[0];
-    if (!f) { toast('Choose an image first', 'warn'); return; }
-    const btn = $('#scan-btn'); btn.disabled = true; btn.textContent = 'Scanning… (OCR)';
-    const fd = new FormData(); fd.append('file', f);
-    try {
-      const r = await api('/documents/scan-licence', { method: 'POST', form: fd });
-      $('#scan-result').innerHTML = renderOcr(r);
-    } catch (e) { $('#scan-result').innerHTML = `<p class="text-red-600 text-sm">${esc(e.message)}</p>`; }
-    finally { btn.disabled = false; btn.textContent = 'Scan licence'; }
-  };
-
-  if (can('documents')) {
-    const [vehicles, drivers] = await Promise.all([api('/vehicles'), api('/drivers')]);
-    $('#upload-host').innerHTML = `<form id="uf" class="space-y-3">
-      <input name="file" type="file" required class="block w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white">
-      ${selectField('Document Type', 'doc_type', ['Driving Licence', 'RC', 'Insurance', 'Permit', 'Other'], 'Driving Licence')}
-      <div class="grid grid-cols-2 gap-3">
-        ${selectField('Driver', 'driver_id', [{ value: '', label: '— none —' }].concat(drivers.map(d => ({ value: d.id, label: d.name }))))}
-        ${selectField('Vehicle', 'vehicle_id', [{ value: '', label: '— none —' }].concat(vehicles.map(v => ({ value: v.id, label: v.registration_number }))))}
-      </div>
-      <button class="w-full py-2.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white font-semibold">Upload document</button>
-    </form>`;
-    $('#uf').onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      if (!fd.get('driver_id')) fd.delete('driver_id');
-      if (!fd.get('vehicle_id')) fd.delete('vehicle_id');
-      try { await api('/documents/upload', { method: 'POST', form: fd }); toast('Document uploaded', 'success'); e.target.reset(); loadDocs(); }
-      catch (err) { toast(err.message, 'error'); }
-    };
-  }
-
-  async function loadDocs() {
-    const rows = await api('/documents');
-    $('#docs-host').innerHTML = card(tableShell(['File', 'Type', 'Linked to', 'OCR Verdict', 'Uploaded', '']));
-    const tb = $('#docs-host tbody');
-    tb.innerHTML = rows.length ? rows.map(d => `<tr class="border-b border-slate-100 dark:border-slate-800">
-      <td class="px-4 py-2.5">${esc(d.filename)}</td>
-      <td class="px-4 py-2.5">${esc(d.doc_type)}</td>
-      <td class="px-4 py-2.5 text-xs text-slate-500">${d.driver_id ? 'Driver #' + d.driver_id : ''}${d.vehicle_id ? 'Vehicle #' + d.vehicle_id : ''}</td>
-      <td class="px-4 py-2.5">${d.ocr_verdict ? badge(d.ocr_verdict === 'VERIFIED' ? 'Completed' : d.ocr_verdict === 'SUSPECT' ? 'Suspended' : 'Open') + ' <span class="text-xs">' + esc(d.ocr_verdict) + '</span>' : '—'}</td>
-      <td class="px-4 py-2.5 text-xs">${esc((d.created_at || '').slice(0, 10))}</td>
-      <td class="px-4 py-2.5 text-right">${can('documents') ? actionBtn('✕', 'text-red-600 hover:bg-red-50') : ''}</td></tr>`).join('') : emptyRow(6, 'No documents uploaded.');
-    if (can('documents')) tb.querySelectorAll('button').forEach((b, i) => b.onclick = () => confirmDelete('this document', async () => { await api(`/documents/${rows[i].id}`, { method: 'DELETE' }); toast('Deleted', 'success'); loadDocs(); }));
-  }
-  loadDocs();
-};
-
-function renderOcr(r) {
-  if (!r.is_licence) return `<div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">⛔ ${esc(r.error || 'Not recognised as a driving licence.')}</div>`;
-  const f = r.fields, v = r.verdict;
-  const rows = [['Name', f.name], ['Licence No', f.license_no], ['Issue Date', f.issue_date], ['Validity', f.validity], ['Classes', (f.classes || []).join(', ')]];
-  return `
-    <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-sm space-y-1 mb-3">
-      ${rows.map(([k, val]) => `<div class="flex justify-between gap-3"><span class="text-slate-400">${k}</span><span class="font-medium text-right">${esc(val || '🔒 masked')}</span></div>`).join('')}
-    </div>
-    <div class="p-3 rounded-lg text-sm font-semibold ${v.name === 'VERIFIED' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : v.name === 'SUSPECT' ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}">
-      ${esc(v.icon)} ${esc(v.name)} — <span class="font-normal">${esc(v.message)}</span>
-    </div>
-    <details class="mt-2 text-xs"><summary class="cursor-pointer text-slate-400">Consistency checks (${r.checks.length})</summary>
-      <div class="mt-2 space-y-1">${r.checks.map(c => `<div>${c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚠️'} <b>${esc(c.label)}</b>: ${esc(c.detail)}</div>`).join('')}</div>
-    </details>`;
+  } catch(e) {}
 }
 
-/* ============================ INCIDENTS ==============================*/
-const SEVERITY_BADGE = {
-  Low: 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  High: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-};
-PAGES.incidents = async function (page) {
-  const actions = can('incidents') ? `<button id="add-i" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">+ Log Incident</button>` : '';
-  page.innerHTML = '';
-  const tb = toolbar({ search: false, actions, filters: [{ name: 'status', label: 'All statuses', options: ['Open', 'Resolved'] }] });
-  page.appendChild(tb);
-  const host = document.createElement('div'); page.appendChild(host);
-  tb.querySelectorAll('[data-filter]').forEach(s => s.onchange = () => load());
-  if (can('incidents')) tb.querySelector('#add-i').onclick = () => iForm();
-
-  async function load() {
-    const q = new URLSearchParams();
-    tb.querySelectorAll('[data-filter]').forEach(s => { if (s.value) q.set(s.dataset.filter, s.value); });
-    const rows = await api('/incidents?' + q.toString());
-    host.innerHTML = card(tableShell(['Driver', 'Severity', 'Description', 'When', 'Status', '']));
-    const tbody = host.querySelector('tbody');
-    if (!rows.length) { tbody.innerHTML = emptyRow(6, 'No incidents logged. ✅'); return; }
-    tbody.innerHTML = rows.map(i => `<tr class="border-b border-slate-100 dark:border-slate-800">
-      <td class="px-4 py-3 font-semibold">${esc(i.driver_name || '#' + i.driver_id)}</td>
-      <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${SEVERITY_BADGE[i.severity] || ''}">${esc(i.severity)}</span></td>
-      <td class="px-4 py-3 text-slate-500">${esc(i.description)}</td>
-      <td class="px-4 py-3 text-xs">${esc((i.occurred_at || '').slice(0, 10))}</td>
-      <td class="px-4 py-3">${badge(i.status)}</td>
-      <td class="px-4 py-3 text-right whitespace-nowrap" data-a></td></tr>`).join('');
-    if (can('incidents')) tbody.querySelectorAll('tr').forEach((tr, idx) => {
-      const i = rows[idx]; const cell = tr.querySelector('[data-a]'); const btns = [];
-      if (i.status === 'Open') btns.push(['Resolve', 'bg-emerald-600 text-white hover:bg-emerald-700', async () => { await api(`/incidents/${i.id}/resolve`, { method: 'POST' }); toast('Resolved', 'success'); load(); }]);
-      btns.push(['✕', 'text-red-600 hover:bg-red-50', () => confirmDelete('this incident', async () => { await api(`/incidents/${i.id}`, { method: 'DELETE' }); toast('Deleted', 'success'); load(); })]);
-      cell.innerHTML = btns.map(([l, c]) => `<button class="px-2.5 py-1 rounded-lg text-xs font-medium ${c}">${l}</button>`).join(' ');
-      cell.querySelectorAll('button').forEach((b, bi) => b.onclick = btns[bi][2]);
-    });
-  }
-  load();
-
-  async function iForm() {
-    const drivers = await api('/drivers');
-    openModal('Log Safety Incident', `<form id="if" class="space-y-3">
-      ${selectField('Driver', 'driver_id', drivers.map(d => ({ value: d.id, label: d.name })))}
-      ${selectField('Severity', 'severity', ['Low', 'Medium', 'High'], 'Low')}
+async function renderDriverRoster(host) {
+  host.innerHTML = `
+    <div class="page-header">
       <div>
-        <label class="block text-sm font-medium mb-1">Description</label>
-        <textarea name="description" required rows="3" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="What happened?"></textarea>
+        <h2 class="page-header-title">Operational Driver Roster</h2>
+        <p class="page-header-sub">Read-only roster for active driver status and categories</p>
       </div>
-      <button class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">Log incident</button>
-    </form>`, (root) => {
-      root.querySelector('#if').onsubmit = async (e) => {
-        e.preventDefault();
-        const d = formData(e.target); d.driver_id = parseInt(d.driver_id);
-        try { await api('/incidents', { method: 'POST', body: d }); toast('Incident logged', 'success'); closeModal(); load(); }
-        catch (err) { toast(err.message, 'error'); }
-      };
-    });
-  }
-};
-
-/* ============================ REPORTS ================================*/
-PAGES.reports = async function (page) {
-  const s = await api('/reports/summary');
-  const t = s.totals;
-  const kpi = (label, val, color) => `<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
-    <div class="text-xs uppercase tracking-wide text-slate-400">${label}</div>
-    <div class="text-2xl font-extrabold mt-1 ${color}">${val}</div></div>`;
-  page.innerHTML = `
-    <div class="flex justify-end gap-2 mb-4">
-      <button id="csv" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">⬇ Export CSV</button>
-      <button id="pdf" class="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">⬇ Export PDF</button>
+      <button class="btn btn-primary" id="btn-add-driver">Add Driver</button>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-      ${kpi('Operational Cost', money(t.operational_cost), 'text-amber-600')}
-      ${kpi('Revenue', money(t.revenue), 'text-emerald-600')}
-      ${kpi('Net', money(t.net), t.net >= 0 ? 'text-emerald-600' : 'text-red-600')}
-      ${kpi('Fleet Efficiency', t.fleet_efficiency_km_per_l + ' km/L', 'text-brand-600')}
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Driver Name</th>
+              <th>License Category</th>
+              <th>License Expiry</th>
+              <th>Contact Number</th>
+              <th>Operational Status</th>
+            </tr>
+          </thead>
+          <tbody id="roster-tbody">
+            <tr><td colspan="5" style="text-align:center" class="text-muted">Loading driver roster...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <h3 class="font-bold mb-2">Per-Vehicle Analytics</h3>
-    <div id="rep-host"></div>
-    <h3 class="font-bold mt-6 mb-2">🚩 Anomaly Detection <span class="text-xs font-normal text-slate-400">— fuel / expense entries &gt; 2σ from the rolling average</span></h3>
-    <div id="anom-host"></div>`;
-  $('#csv').onclick = () => downloadReport('csv');
-  $('#pdf').onclick = () => downloadReport('pdf');
-  api('/reports/anomalies').then(a => {
-    const h = $('#anom-host'); if (!h) return;
-    if (!a.flags.length) { h.innerHTML = card(`<div class="p-4 text-sm text-emerald-600">✅ No anomalies detected — all fuel &amp; expense entries look normal.</div>`); return; }
-    h.innerHTML = card(tableShell(['Type', 'Vehicle / Category', 'Flag']));
-    $('#anom-host tbody').innerHTML = a.flags.map(f => `<tr class="border-b border-slate-100 dark:border-slate-800">
-      <td class="px-4 py-2.5">${badge(f.type === 'Fuel' ? 'On Trip' : 'In Shop')} ${esc(f.type)}</td>
-      <td class="px-4 py-2.5 font-mono text-xs">${esc(f.vehicle)}</td>
-      <td class="px-4 py-2.5 text-amber-600">⚠️ ${esc(f.detail)}</td></tr>`).join('');
-  }).catch(() => {});
-  $('#rep-host').innerHTML = card(tableShell(['Vehicle', 'Type', 'Distance', 'Efficiency', 'Fuel ₹', 'Maint. ₹', 'Op. Cost', 'Revenue', 'ROI']));
-  const tb = $('#rep-host tbody');
-  tb.innerHTML = s.vehicles.length ? s.vehicles.map(v => `<tr class="border-b border-slate-100 dark:border-slate-800">
-    <td class="px-4 py-2.5 font-mono text-xs font-semibold">${esc(v.registration_number)}</td>
-    <td class="px-4 py-2.5">${esc(v.type)}</td>
-    <td class="px-4 py-2.5">${num(v.distance_km)} km</td>
-    <td class="px-4 py-2.5">${v.fuel_efficiency_km_per_l} km/L</td>
-    <td class="px-4 py-2.5">${money(v.fuel_cost)}</td>
-    <td class="px-4 py-2.5">${money(v.maintenance_cost)}</td>
-    <td class="px-4 py-2.5">${money(v.operational_cost)}</td>
-    <td class="px-4 py-2.5">${money(v.revenue)}</td>
-    <td class="px-4 py-2.5"><span class="font-semibold ${v.roi >= 0 ? 'text-emerald-600' : 'text-red-600'}">${(v.roi * 100).toFixed(1)}%</span></td></tr>`).join('') : emptyRow(9);
-};
-async function downloadReport(kind) {
+  `;
+  
   try {
-    const blob = await api(`/reports/export.${kind}`);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `transitops_report.${kind}`; a.click();
-    URL.revokeObjectURL(url); toast(`${kind.toUpperCase()} downloaded`, 'success');
-  } catch (e) { toast(e.message, 'error'); }
-}
+    const drivers = await request("/api/drivers");
+    const tbody = document.getElementById("roster-tbody");
+    tbody.innerHTML = "";
+    
+    drivers.forEach(d => {
+      let statusBadge = "badge-gray";
+      if (d.status === "Available") statusBadge = "badge-green";
+      else if (d.status === "On Trip") statusBadge = "badge-blue";
+      else if (d.status === "Suspended") statusBadge = "badge-red";
+      
+      tbody.innerHTML += `
+        <tr>
+          <td><span class="fw-600">${d.name}</span></td>
+          <td>${d.license_category || 'N/A'}</td>
+          <td>${d.license_expiry || 'N/A'}</td>
+          <td>${d.contact_number || 'N/A'}</td>
+          <td><span class="badge ${statusBadge}">${d.status}</span></td>
+        </tr>
+      `;
+    });
+  } catch(e) {}
 
-/* ============================ Confirm dialog ========================*/
-function confirmDelete(what, onYes) {
-  openModal('Please confirm', `<p class="text-sm text-slate-600 dark:text-slate-300 mb-5">Are you sure you want to delete <b>${esc(what)}</b>? This cannot be undone.</p>
-    <div class="flex gap-2"><button id="cd-no" class="flex-1 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-medium">Cancel</button>
-    <button id="cd-yes" class="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Delete</button></div>`, (root) => {
-    root.querySelector('#cd-no').onclick = closeModal;
-    root.querySelector('#cd-yes').onclick = async () => { try { await onYes(); closeModal(); } catch (e) { toast(e.message, 'error'); } };
+  document.getElementById("btn-add-driver").addEventListener("click", () => {
+    const bodyHtml = `
+      <form id="new-driver-form">
+        <div class="form-group" style="padding: 10px; background: var(--c-bg); border-radius: var(--radius); border: 1px dashed var(--c-accent);">
+          <label class="form-label">Upload License (Auto-fill with OCR)</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="file" id="d-license-img" class="form-control" accept="image/*" style="flex:1">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-scan-ocr">Scan</button>
+          </div>
+          <div id="ocr-status" class="text-sm text-muted mt-2"></div>
+        </div>
+        <div class="form-row mt-3">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input id="d-name" type="text" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email (For reminders)</label>
+            <input id="d-email" type="email" class="form-control" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">License Number</label>
+            <input id="d-lic-num" type="text" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">License Category</label>
+            <input id="d-lic-cat" type="text" class="form-control" placeholder="LMV, HMV">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">License Expiry</label>
+            <input id="d-lic-exp" type="date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Phone</label>
+            <input id="d-phone" type="text" class="form-control">
+          </div>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-driver">Create Driver</button>
+    `;
+    showModal("Register New Driver", bodyHtml, footerHtml);
+    
+    let uploadedFile = null;
+
+    document.getElementById("btn-scan-ocr").addEventListener("click", async () => {
+      const fileInput = document.getElementById("d-license-img");
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showToast("Select an image first", "error");
+        return;
+      }
+      uploadedFile = fileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
+      
+      const status = document.getElementById("ocr-status");
+      status.innerHTML = `<span style="color:var(--c-amber)">Scanning license via OCR...</span>`;
+      
+      try {
+        const res = await fetch("/api/documents/scan-licence", {
+          method: "POST",
+          headers: { "Authorization": \`Bearer \${state.token}\` },
+          body: formData
+        });
+        if (!res.ok) throw new Error("OCR Failed");
+        const data = await res.json();
+        
+        if (data.is_licence && data.fields) {
+          if (data.fields.name) document.getElementById("d-name").value = data.fields.name;
+          if (data.fields.license_no) document.getElementById("d-lic-num").value = data.fields.license_no;
+          if (data.fields.classes) document.getElementById("d-lic-cat").value = data.fields.classes.join(", ");
+          status.innerHTML = `<span style="color:var(--c-green)">OCR Success! Verify fields below. Verdict: \${data.verdict.name}</span>`;
+          showToast("License scanned successfully");
+        } else {
+          status.innerHTML = `<span style="color:var(--c-red)">Not recognized as a valid driving license.</span>`;
+        }
+      } catch(e) {
+        status.innerHTML = `<span style="color:var(--c-red)">OCR Error: \${e.message}</span>`;
+      }
+    });
+
+    document.getElementById("btn-submit-driver").addEventListener("click", async () => {
+      const body = {
+        name: document.getElementById("d-name").value,
+        email: document.getElementById("d-email").value,
+        license_number: document.getElementById("d-lic-num").value,
+        license_category: document.getElementById("d-lic-cat").value,
+        license_expiry: document.getElementById("d-lic-exp").value || null,
+        contact_number: document.getElementById("d-phone").value,
+        status: "Available"
+      };
+      
+      if (!body.name || !body.license_number) {
+        showToast("Name and License Number are required", "error");
+        return;
+      }
+
+      try {
+        const dRes = await request("/api/drivers", {
+          method: "POST",
+          body: JSON.stringify(body)
+        });
+        
+        if (uploadedFile) {
+          const docForm = new FormData();
+          docForm.append("file", uploadedFile);
+          docForm.append("doc_type", "Driving Licence");
+          docForm.append("driver_id", dRes.id);
+          
+          await fetch("/api/documents/upload", {
+            method: "POST",
+            headers: { "Authorization": \`Bearer \${state.token}\` },
+            body: docForm
+          });
+        }
+        
+        showToast("Driver added successfully!");
+        closeModal();
+        // reload list
+        renderDriverRoster(document.getElementById("page"));
+      } catch(e) {}
+    });
   });
 }
 
-/* ============================ Theme + chrome ========================*/
-function applyTheme() {
-  const dark = localStorage.getItem('to_theme') === 'dark' ||
-    (!localStorage.getItem('to_theme') && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', dark);
-  const t = $('#theme-toggle'); if (t) t.textContent = dark ? '☀️' : '🌙';
-}
-function openSidebar() { $('#sidebar').classList.remove('-translate-x-full'); $('#backdrop').classList.remove('hidden'); }
-function closeSidebar() { $('#sidebar').classList.add('-translate-x-full'); $('#backdrop').classList.add('hidden'); }
+// -------------------------------------------------------------
+// DRIVER PAGES (4)
+// -------------------------------------------------------------
 
-/* ============================ Boot ==================================*/
-function wireChrome() {
-  $('#login-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const err = $('#login-error'); err.classList.add('hidden');
-    try { await doLogin($('#login-email').value.trim(), $('#login-password').value); showApp(); }
-    catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
-  };
-  $('#logout-btn').onclick = logout;
-  $('#menu-btn').onclick = openSidebar;
-  $('#backdrop').onclick = closeSidebar;
-  $('#theme-toggle').onclick = () => {
-    const dark = !document.documentElement.classList.contains('dark');
-    localStorage.setItem('to_theme', dark ? 'dark' : 'light');
-    applyTheme();
-    if (State.user && State.route === 'dashboard') navigate('dashboard'); // redraw charts with new colors
-  };
-  renderDemoAccounts();
+async function renderDriverTrips(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">My Dispatched Tasks</h2>
+        <p class="page-header-sub">Execute active routes or view completed trip logs</p>
+      </div>
+    </div>
+    
+    <div id="driver-active-trip-section" class="mb-4"></div>
+    
+    <div class="card">
+      <div class="card-header"><span class="card-title">Completed Trip History</span></div>
+      <div class="card-body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Trip ID</th>
+                <th>Source/Destination</th>
+                <th>Vehicle Used</th>
+                <th>Cargo Load</th>
+                <th>Total Fuel Cost</th>
+                <th>Odometer Range</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="driver-trips-tbody">
+              <tr><td colspan="7" style="text-align:center" class="text-muted">Checking trip logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  try {
+    const trips = await request("/api/trips");
+    const activeSection = document.getElementById("driver-active-trip-section");
+    const tbody = document.getElementById("driver-trips-tbody");
+    tbody.innerHTML = "";
+    
+    const drivers = await request("/api/drivers");
+    const meDriver = drivers.find(d => d.email === state.email);
+    const myDriverId = meDriver ? meDriver.id : -1;
+    
+    // Filter trips for this driver
+    const driverTrips = trips.filter(t => t.driver_id === myDriverId);
+    const activeTrip = driverTrips.find(t => t.status === "Dispatched");
+    
+    if (activeTrip) {
+      activeSection.innerHTML = `
+        <div class="card" style="border-left: 5px solid var(--c-accent)">
+          <div class="card-header"><span class="card-title">Active Dispatched Trip</span></div>
+          <div class="card-body">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px">
+              <div>
+                <div style="font-size:1.2rem; font-weight:700">${activeTrip.source} ➔ ${activeTrip.destination}</div>
+                <div class="text-muted text-sm" style="margin-top:4px">Vehicle: ${activeTrip.vehicle_name} | Cargo weight: ${activeTrip.cargo_weight} kg</div>
+                <div class="text-muted text-sm">Estimated Distance: ${activeTrip.planned_distance} km | Duration: ${activeTrip.planned_duration} hrs</div>
+              </div>
+              <button class="btn btn-primary" onclick="renderDriverTripExecution(${activeTrip.id})">Execute & Complete Trip</button>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      activeSection.innerHTML = `
+        <div class="alert alert-info">
+          No active dispatched trips. Sit tight or report to the Fleet Manager for schedules.
+        </div>
+      `;
+    }
+    
+    const completedTrips = driverTrips.filter(t => t.status === "Completed" || t.status === "Cancelled");
+    if (completedTrips.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center" class="text-muted">No completed trip history.</td></tr>`;
+      return;
+    }
+    
+    completedTrips.forEach(t => {
+      tbody.innerHTML += `
+        <tr>
+          <td><span class="fw-600">TRIP-${t.id}</span></td>
+          <td>${t.source} ➔ ${t.destination}</td>
+          <td>${t.vehicle_name}</td>
+          <td>${t.cargo_weight.toLocaleString()} kg</td>
+          <td>${t.fuel_consumed ? t.fuel_consumed + ' L' : 'N/A'}</td>
+          <td>${t.start_odometer} - ${t.final_odometer} km</td>
+          <td><span class="badge ${t.status === 'Completed' ? 'badge-green' : 'badge-red'}">${t.status}</span></td>
+        </tr>
+      `;
+    });
+    
+  } catch(e) {}
 }
 
-applyTheme();
-wireChrome();
-if (State.token && State.user) { showApp(); }
+window.renderDriverTripExecution = async function(tripId) {
+  const host = document.getElementById("page");
+  document.getElementById("page-title").innerText = "TRIP EXECUTION";
+  
+  try {
+    const trip = await request(`/api/trips/${tripId}`);
+    
+    host.innerHTML = `
+      <div class="page-header">
+        <div>
+          <h2 class="page-header-title">Execute Trip - TRIP-${trip.id}</h2>
+          <p class="page-header-sub">Submit logs and final odometer range on completion</p>
+        </div>
+      </div>
+      
+      <div class="card" style="max-width: 500px; margin: 0 auto">
+        <div class="card-body">
+          <form id="trip-complete-form">
+            <div class="form-group">
+              <label class="form-label">Current Start Odometer</label>
+              <input type="text" class="form-control" value="${trip.start_odometer || 0} km" disabled>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Final Odometer Reading (km)</label>
+              <input id="c-final-odo" type="number" class="form-control" required min="${trip.start_odometer || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fuel Consumed (Liters)</label>
+              <input id="c-fuel" type="number" class="form-control" required min="1">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full mt-2">Log Completion</button>
+          </form>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById("trip-complete-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const finalOdo = parseFloat(document.getElementById("c-final-odo").value);
+      const fuel = parseFloat(document.getElementById("c-fuel").value);
+      
+      await request(`/api/trips/${trip.id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ final_odometer: finalOdo, fuel_consumed: fuel })
+      });
+      showToast("Trip completed. Drive Safe!");
+      state.currentPage = "driver_trips";
+      renderPage();
+    });
+  } catch(e) {}
+};
+
+async function renderDriverVehicle(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">My Assigned Vehicle</h2>
+        <p class="page-header-sub">Read-only metrics of your last assigned vehicle</p>
+      </div>
+    </div>
+    <div id="driver-vehicle-host">Checking vehicle assignment...</div>
+  `;
+  
+  try {
+    const trips = await request("/api/trips");
+    const drivers = await request("/api/drivers");
+    const meDriver = drivers.find(d => d.email === state.email);
+    const myDriverId = meDriver ? meDriver.id : -1;
+    const driverTrips = trips.filter(t => t.driver_id === myDriverId);
+    
+    if (driverTrips.length === 0) {
+      document.getElementById("driver-vehicle-host").innerHTML = `<div class="alert alert-info">No vehicle has been assigned to you yet.</div>`;
+      return;
+    }
+    
+    const lastTrip = driverTrips[0]; // order is desc
+    const vehicle = await request(`/api/vehicles/${lastTrip.vehicle_id}`);
+    
+    let statusBadge = "badge-gray";
+    if (vehicle.status === "Available") statusBadge = "badge-green";
+    else if (vehicle.status === "On Trip") statusBadge = "badge-blue";
+    else if (vehicle.status === "In Shop") statusBadge = "badge-amber";
+    
+    document.getElementById("driver-vehicle-host").innerHTML = `
+      <div class="card" style="max-width:600px">
+        <div class="card-header"><span class="card-title">${vehicle.name} — ${vehicle.registration_number}</span></div>
+        <div class="card-body">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px">
+            <div>
+              <div class="text-muted text-sm">Vehicle Classification</div>
+              <div class="fw-600" style="font-size:1.1rem">${vehicle.type}</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">Load Limit</div>
+              <div class="fw-600" style="font-size:1.1rem">${vehicle.max_load_capacity.toLocaleString()} kg</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">Odometer Reading</div>
+              <div class="fw-600" style="font-size:1.1rem">${vehicle.odometer.toLocaleString()} km</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">Status</div>
+              <div><span class="badge ${statusBadge}">${vehicle.status}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch(e) {}
+}
+
+async function renderDriverProfile(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">My Compliance Profile</h2>
+        <p class="page-header-sub">View license validity and safety records</p>
+      </div>
+    </div>
+    <div id="driver-profile-host">Loading profile...</div>
+  `;
+  
+  try {
+    const drivers = await request("/api/drivers");
+    const ratings = await request("/api/ratings/drivers");
+    const dObj = drivers.find(d => d.email === state.email);
+    
+    if (!dObj) {
+      document.getElementById("driver-profile-host").innerHTML = `<div class="alert alert-error">Driver profile link not found.</div>`;
+      return;
+    }
+    
+    const rating = ratings.find(r => r.driver_id === dObj.id);
+    const starsHtml = rating ? renderStars(rating.stars, rating.band) : 'Not Rated';
+    
+    document.getElementById("driver-profile-host").innerHTML = `
+      <div class="card" style="max-width:600px">
+        <div class="card-body">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px">
+            <div>
+              <div class="text-muted text-sm">License Number</div>
+              <div class="fw-600" style="font-size:1.1rem">${dObj.license_number}</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">License Category</div>
+              <div class="fw-600" style="font-size:1.1rem">${dObj.license_category || 'N/A'}</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">License Expiry Date</div>
+              <div class="fw-600" style="font-size:1.1rem">${dObj.license_expiry || 'N/A'}</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">Safety Score & Rating</div>
+              <div class="fw-600" style="font-size:1.1rem">${starsHtml}</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">Contact Phone</div>
+              <div class="fw-600" style="font-size:1.1rem">${dObj.contact_number || 'N/A'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch(e) {}
+}
+
+// -------------------------------------------------------------
+// SAFETY OFFICER PAGES (4)
+// -------------------------------------------------------------
+
+async function renderSafetyCompliance(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">License Compliance Board</h2>
+        <p class="page-header-sub">Track active driver licenses expirations and system alerts</p>
+      </div>
+    </div>
+    
+    <div id="safety-strip"></div>
+    
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Expired or Near-Expiration Drivers (License status)</div>
+        <div class="chart-body" id="expired-drivers-list">Loading alerts...</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Suspended Drivers</div>
+        <div class="chart-body" id="suspended-drivers-list">Loading...</div>
+      </div>
+    </div>
+  `;
+  
+  const strip = document.getElementById("safety-strip");
+  renderOverviewStrip(strip);
+  
+  try {
+    const drivers = await request("/api/drivers");
+    const expList = document.getElementById("expired-drivers-list");
+    const suspList = document.getElementById("suspended-drivers-list");
+    
+    // Near expiry list
+    const nearExpiry = drivers.filter(d => d.license_expired || d.status === "Suspended");
+    const now = new Date();
+    
+    const alertDrivers = drivers.filter(d => {
+      if (!d.license_expiry) return false;
+      const exp = new Date(d.license_expiry);
+      const days = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+      return days <= 30;
+    });
+    
+    if (alertDrivers.length === 0) {
+      expList.innerHTML = `<div class="empty-state"><p>All driver licenses are compliant.</p></div>`;
+    } else {
+      expList.innerHTML = `
+        <table class="text-sm">
+          <thead>
+            <tr><th>Name</th><th>License #</th><th>Expiry Date</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${alertDrivers.map(d => {
+              const exp = new Date(d.license_expiry);
+              const days = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+              const badge = days < 0 ? 'badge-red' : 'badge-amber';
+              const text = days < 0 ? 'Expired' : `${days} days left`;
+              return `
+                <tr>
+                  <td><span class="fw-600">${d.name}</span></td>
+                  <td>${d.license_number}</td>
+                  <td>${d.license_expiry}</td>
+                  <td><span class="badge ${badge}">${text}</span></td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+    
+    // Suspended list
+    const suspended = drivers.filter(d => d.status === "Suspended");
+    if (suspended.length === 0) {
+      suspList.innerHTML = `<div class="empty-state"><p>No suspended drivers.</p></div>`;
+    } else {
+      suspList.innerHTML = `
+        <table class="text-sm">
+          <thead>
+            <tr><th>Name</th><th>License #</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${suspended.map(d => `
+              <tr>
+                <td><span class="fw-600">${d.name}</span></td>
+                <td>${d.license_number}</td>
+                <td><span class="badge badge-red">Suspended</span></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+  } catch(e) {}
+}
+
+async function renderSafetyDrivers(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Driver Directory</h2>
+        <p class="page-header-sub">Verify licenses details and manage driver statuses</p>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Driver Name</th>
+              <th>License ID</th>
+              <th>License Category</th>
+              <th>Expiry Date</th>
+              <th>Contact Phone</th>
+              <th>Availability</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="safety-drivers-tbody">
+            <tr><td colspan="7" style="text-align:center" class="text-muted">Loading driver roster...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadDrivers() {
+    try {
+      const drivers = await request("/api/drivers");
+      const tbody = document.getElementById("safety-drivers-tbody");
+      tbody.innerHTML = "";
+      
+      drivers.forEach(d => {
+        let statusBadge = "badge-gray";
+        if (d.status === "Available") statusBadge = "badge-green";
+        else if (d.status === "On Trip") statusBadge = "badge-blue";
+        else if (d.status === "Suspended") statusBadge = "badge-red";
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">${d.name}</span></td>
+            <td>${d.license_number}</td>
+            <td>${d.license_category || 'N/A'}</td>
+            <td>${d.license_expiry || 'N/A'}</td>
+            <td>${d.contact_number || 'N/A'}</td>
+            <td><span class="badge ${statusBadge}">${d.status}</span></td>
+            <td class="table-actions">
+              ${d.status === "Suspended" ? `
+                <button class="btn btn-secondary btn-sm" onclick="reinstateDriver(${d.id})">Reinstate</button>
+              ` : `
+                <button class="btn btn-danger btn-sm" onclick="suspendDriver(${d.id})">Suspend</button>
+              `}
+              <button class="btn btn-secondary btn-sm" onclick="editLicenseModal(${d.id})">Edit License</button>
+            </td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  window.suspendDriver = async function(id) {
+    if (confirm("Are you sure you want to suspend this driver? They will be blocked from trip assignments.")) {
+      await request(`/api/drivers/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "Suspended" })
+      });
+      showToast("Driver suspended.");
+      loadDrivers();
+    }
+  };
+  
+  window.reinstateDriver = async function(id) {
+    if (confirm("Reinstate this driver to Available?")) {
+      await request(`/api/drivers/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "Available" })
+      });
+      showToast("Driver reinstated.");
+      loadDrivers();
+    }
+  };
+  
+  window.editLicenseModal = async function(id) {
+    const drivers = await request("/api/drivers");
+    const d = drivers.find(drv => drv.id === id);
+    
+    const bodyHtml = `
+      <form id="edit-license-form">
+        <div class="form-group">
+          <label class="form-label">License Number</label>
+          <input id="l-num" type="text" class="form-control" value="${d.license_number}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">License Category</label>
+          <input id="l-cat" type="text" class="form-control" value="${d.license_category || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">License Expiry Date</label>
+          <input id="l-exp" type="date" class="form-control" value="${d.license_expiry || ''}" required>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-license">Save Changes</button>
+    `;
+    showModal(`Edit License Data - ${d.name}`, bodyHtml, footerHtml);
+    
+    document.getElementById("btn-save-license").addEventListener("click", async () => {
+      const body = {
+        license_number: document.getElementById("l-num").value,
+        license_category: document.getElementById("l-cat").value,
+        license_expiry: document.getElementById("l-exp").value
+      };
+      
+      await request(`/api/drivers/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(body)
+      });
+      showToast("License data updated.");
+      closeModal();
+      loadDrivers();
+    });
+  };
+  
+  loadDrivers();
+}
+
+async function renderSafetyScores(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Driver Safety Scores</h2>
+        <p class="page-header-sub">Monitor safety performance star ratings and leaderboard</p>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Driver Name</th>
+              <th>Star Rating</th>
+              <th>Safety Score</th>
+              <th>License Compliance</th>
+              <th>Reliability</th>
+              <th>On Time Completion</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="safety-scores-tbody">
+            <tr><td colspan="7" style="text-align:center" class="text-muted">Calculating safety score leaderboard...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadScores() {
+    try {
+      const ratings = await request("/api/ratings/drivers");
+      const tbody = document.getElementById("safety-scores-tbody");
+      tbody.innerHTML = "";
+      
+      ratings.forEach(r => {
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">${r.name}</span></td>
+            <td>${renderStars(r.stars, r.band)}</td>
+            <td>${Math.round(r.safety * 100)}%</td>
+            <td>${Math.round(r.compliance * 100)}%</td>
+            <td>${Math.round(r.completion * 100)}%</td>
+            <td>${Math.round(r.on_time * 100)}%</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="adjustSafetyScoreModal(${r.driver_id})">Adjust Score</button>
+            </td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  window.adjustSafetyScoreModal = async function(id) {
+    const drivers = await request("/api/drivers");
+    const d = drivers.find(drv => drv.id === id);
+    
+    const bodyHtml = `
+      <form id="adjust-score-form">
+        <div class="form-group">
+          <label class="form-label">Safety Score (0 - 100)</label>
+          <input id="s-score" type="number" class="form-control" value="${d.safety_score}" required min="0" max="100">
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-score">Save Score</button>
+    `;
+    showModal(`Adjust Driver Score - ${d.name}`, bodyHtml, footerHtml);
+    
+    document.getElementById("btn-save-score").addEventListener("click", async () => {
+      const score = parseFloat(document.getElementById("s-score").value);
+      await request(`/api/drivers/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ safety_score: score })
+      });
+      showToast("Driver safety score adjusted.");
+      closeModal();
+      loadScores();
+    });
+  };
+  
+  loadScores();
+}
+
+async function renderSafetyIncidents(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Driver Incident Log</h2>
+        <p class="page-header-sub">Log safety violations, route exceptions, or collisions</p>
+      </div>
+      <button class="btn btn-primary" id="btn-log-incident">Log New Incident</button>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Driver</th>
+              <th>Severity</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Logged Date</th>
+            </tr>
+          </thead>
+          <tbody id="incidents-tbody">
+            <tr><td colspan="6" style="text-align:center" class="text-muted">Loading incident log...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadIncidents() {
+    try {
+      const incidents = await request("/api/incidents");
+      const tbody = document.getElementById("incidents-tbody");
+      tbody.innerHTML = "";
+      
+      if (incidents.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center" class="text-muted">No incidents logged. Safe operations!</td></tr>`;
+        return;
+      }
+      
+      incidents.forEach(i => {
+        let badge = "badge-gray";
+        if (i.severity === "Low") badge = "badge-blue";
+        else if (i.severity === "Medium") badge = "badge-amber";
+        else if (i.severity === "High") badge = "badge-red";
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">INC-${i.id}</span></td>
+            <td>${i.driver_name}</td>
+            <td><span class="badge ${badge}">${i.severity}</span></td>
+            <td>${i.description}</td>
+            <td><span class="badge ${i.status === 'Open' ? 'badge-red' : 'badge-green'}">${i.status}</span></td>
+            <td>${new Date(i.occurred_at).toLocaleDateString()}</td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  document.getElementById("btn-log-incident").addEventListener("click", async () => {
+    const drivers = await request("/api/drivers");
+    const bodyHtml = `
+      <form id="new-incident-form">
+        <div class="form-group">
+          <label class="form-label">Select Driver</label>
+          <select id="i-driver" class="form-control" required>
+            ${drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Severity Level</label>
+          <select id="i-severity" class="form-control" required>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High (Reduces safety rating immediately)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Incident Description</label>
+          <textarea id="i-desc" class="form-control" rows="3" placeholder="What happened?" required></textarea>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-incident">Log Incident</button>
+    `;
+    showModal("Log Safety Incident", bodyHtml, footerHtml);
+    
+    document.getElementById("btn-submit-incident").addEventListener("click", async () => {
+      const body = {
+        driver_id: parseInt(document.getElementById("i-driver").value),
+        severity: document.getElementById("i-severity").value,
+        description: document.getElementById("i-desc").value
+      };
+      
+      await request("/api/incidents", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      showToast("Incident logged successfully.");
+      closeModal();
+      loadIncidents();
+    });
+  });
+  
+  loadIncidents();
+}
+
+// -------------------------------------------------------------
+// FINANCIAL ANALYST PAGES (5)
+// -------------------------------------------------------------
+
+async function renderFinanceDashboard(host) {
+  host.innerHTML = `
+    <div id="metrics-strip"></div>
+    
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Cost Breakdown Overview</div>
+        <div class="chart-body"><canvas id="costBreakdownChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Vehicle ROI Rankings (Net profit / acquisition cost)</div>
+        <div class="chart-body" id="roi-rankings-list">Loading vehicle analytics...</div>
+      </div>
+    </div>
+    
+    <div class="card mb-4" id="anomalies-card" style="display:none">
+      <div class="card-header"><span class="card-title" style="color:var(--c-red); font-weight:700">Financial Anomalies Flagged (&gt; 2 Standard Deviations)</span></div>
+      <div class="card-body">
+        <div class="table-wrap">
+          <table class="text-sm">
+            <thead>
+              <tr><th>Type</th><th>Vehicle/Category</th><th>Outlier Details</th></tr>
+            </thead>
+            <tbody id="anomalies-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const strip = document.getElementById("metrics-strip");
+  renderOverviewStrip(strip);
+  
+  try {
+    const data = await request("/api/reports/summary");
+    const anomalies = await request("/api/reports/anomalies");
+    
+    // Cost breakdown Chart
+    new Chart(document.getElementById("costBreakdownChart"), {
+      type: "doughnut",
+      data: {
+        labels: ["Fuel Cost", "Maintenance Cost", "Other Expenses"],
+        datasets: [{
+          data: [data.totals.fuel_cost, data.totals.maintenance_cost, data.totals.other_expenses],
+          backgroundColor: ["#f59e0b", "#3b82f6", "#10b981"]
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+    
+    // ROI Rankings
+    const roiList = document.getElementById("roi-rankings-list");
+    const sortedVehicles = data.vehicles.sort((a,b) => b.roi - a.roi);
+    
+    roiList.innerHTML = `
+      <table class="text-sm">
+        <thead>
+          <tr><th>Reg Number</th><th>Operational Cost</th><th>Total Revenue</th><th>ROI</th></tr>
+        </thead>
+        <tbody>
+          ${sortedVehicles.map(v => {
+            const roiPct = Math.round(v.roi * 100);
+            return `
+              <tr>
+                <td><span class="fw-600">${v.registration_number}</span></td>
+                <td>₹${v.operational_cost.toLocaleString()}</td>
+                <td>₹${v.revenue.toLocaleString()}</td>
+                <td><span class="badge ${v.roi > 0 ? 'badge-green' : 'badge-red'}">${roiPct}%</span></td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    `;
+    
+    // Financial Anomalies
+    if (anomalies.count > 0) {
+      document.getElementById("anomalies-card").style.display = "block";
+      const tbody = document.getElementById("anomalies-tbody");
+      tbody.innerHTML = anomalies.flags.map(f => `
+        <tr>
+          <td><span class="badge badge-red">${f.type}</span></td>
+          <td><span class="fw-600">${f.vehicle}</span></td>
+          <td>${f.detail}</td>
+        </tr>
+      `).join("");
+    }
+    
+  } catch(e) {}
+}
+
+async function renderFinanceRevenue(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Trip Revenue Logging</h2>
+        <p class="page-header-sub">View and update revenue collected per trip</p>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Trip ID</th>
+              <th>Source ➔ Destination</th>
+              <th>Vehicle / Driver</th>
+              <th>Actual Distance</th>
+              <th>Expected Revenue</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="revenue-tbody">
+            <tr><td colspan="6" style="text-align:center" class="text-muted">Loading completed trips...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadRevenue() {
+    try {
+      const trips = await request("/api/trips");
+      const tbody = document.getElementById("revenue-tbody");
+      tbody.innerHTML = "";
+      
+      const eligible = trips.filter(t => t.status === "Completed");
+      if (eligible.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center" class="text-muted">No completed trips require revenue adjustment.</td></tr>`;
+        return;
+      }
+      
+      eligible.forEach(t => {
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">TRIP-${t.id}</span></td>
+            <td>${t.source} ➔ ${t.destination}</td>
+            <td>${t.vehicle_name} / ${t.driver_name}</td>
+            <td>${t.actual_distance || t.planned_distance} km</td>
+            <td><span class="fw-600">₹${t.revenue.toLocaleString()}</span></td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="logRevenueModal(${t.id})">Adjust Revenue</button>
+            </td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  window.logRevenueModal = async function(id) {
+    const trips = await request("/api/trips");
+    const t = trips.find(tr => tr.id === id);
+    
+    const bodyHtml = `
+      <form id="adjust-revenue-form">
+        <div class="form-group">
+          <label class="form-label">Adjust Revenue (₹)</label>
+          <input id="r-amount" type="number" class="form-control" value="${t.revenue}" required min="0">
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-revenue">Save Revenue</button>
+    `;
+    showModal(`Trip Revenue Log - TRIP-${t.id}`, bodyHtml, footerHtml);
+    
+    document.getElementById("btn-save-revenue").addEventListener("click", async () => {
+      const amount = parseFloat(document.getElementById("r-amount").value || 0);
+      await request(`/api/trips/${id}/revenue`, {
+        method: "PUT",
+        body: JSON.stringify({ revenue: amount })
+      });
+      showToast("Revenue recorded.");
+      closeModal();
+      loadRevenue();
+    });
+  };
+  
+  loadRevenue();
+}
+
+async function renderFinanceExpenses(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Fuel & Operational Expenses</h2>
+        <p class="page-header-sub">Log tolls, fines, parking charges, or non-fuel categories</p>
+      </div>
+      <button class="btn btn-primary" id="btn-log-expense">Log Expense</button>
+    </div>
+    
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Expense Log</span></div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="expense-list-tbody">
+                <tr><td colspan="5" style="text-align:center" class="text-muted">Loading expense logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header"><span class="card-title">Fuel Log (Read-only)</span></div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Liters</th>
+                  <th>Odometer</th>
+                  <th>Total Cost</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="fuel-list-tbody">
+                <tr><td colspan="5" style="text-align:center" class="text-muted">Loading fuel logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  async function loadExpensesAndFuel() {
+    try {
+      const expenses = await request("/api/expenses");
+      const fuel = await request("/api/fuel");
+      const eTbody = document.getElementById("expense-list-tbody");
+      const fTbody = document.getElementById("fuel-list-tbody");
+      
+      eTbody.innerHTML = expenses.map(e => `
+        <tr>
+          <td><span class="fw-600">${e.vehicle_name || 'N/A'}</span></td>
+          <td><span class="badge badge-blue">${e.category}</span></td>
+          <td><span class="fw-600">₹${e.amount.toLocaleString()}</span></td>
+          <td>${e.description}</td>
+          <td>${e.expense_date}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" style="text-align:center" class="text-muted">No expenses recorded.</td></tr>`;
+      
+      fTbody.innerHTML = fuel.map(f => `
+        <tr>
+          <td><span class="fw-600">${f.vehicle_name}</span></td>
+          <td>${f.liters} L</td>
+          <td>${f.odometer || 'N/A'} km</td>
+          <td><span class="fw-600">₹${f.cost.toLocaleString()}</span></td>
+          <td>${f.log_date}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" style="text-align:center" class="text-muted">No fuel logs found.</td></tr>`;
+      
+    } catch(e) {}
+  }
+  
+  document.getElementById("btn-log-expense").addEventListener("click", async () => {
+    const vehicles = await request("/api/vehicles");
+    const activeVehicles = vehicles.filter(v => v.status !== "Retired");
+    
+    const bodyHtml = `
+      <form id="new-expense-form">
+        <div class="form-group">
+          <label class="form-label">Select Vehicle</label>
+          <select id="e-vehicle" class="form-control" required>
+            ${activeVehicles.map(v => `<option value="${v.id}">${v.registration_number} (${v.name})</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expense Category</label>
+          <select id="e-cat" class="form-control" required>
+            <option value="Toll">Toll</option>
+            <option value="Fine">Fine</option>
+            <option value="Parking">Parking</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input id="e-amount" type="number" class="form-control" required min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description Notes</label>
+          <input id="e-desc" type="text" class="form-control" placeholder="Details (e.g., NH Speed Fine)" required>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-expense">Log Expense</button>
+    `;
+    showModal("Log Operational Expense", bodyHtml, footerHtml);
+    
+    document.getElementById("btn-submit-expense").addEventListener("click", async () => {
+      const body = {
+        vehicle_id: parseInt(document.getElementById("e-vehicle").value),
+        category: document.getElementById("e-cat").value,
+        amount: parseFloat(document.getElementById("e-amount").value),
+        description: document.getElementById("e-desc").value
+      };
+      
+      await request("/api/expenses", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      showToast("Expense logged successfully.");
+      closeModal();
+      loadExpensesAndFuel();
+    });
+  });
+  
+  loadExpensesAndFuel();
+}
+
+async function renderFinanceMaint(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Maintenance Costs (Read-only)</h2>
+        <p class="page-header-sub">View financial records for vehicle repairs and planned services</p>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Vehicle Name</th>
+              <th>Service Type</th>
+              <th>Service Date</th>
+              <th>Classification</th>
+              <th>Final Cost</th>
+            </tr>
+          </thead>
+          <tbody id="maint-cost-tbody">
+            <tr><td colspan="5" style="text-align:center" class="text-muted">Loading maintenance costs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  try {
+    const logs = await request("/api/maintenance");
+    const tbody = document.getElementById("maint-cost-tbody");
+    tbody.innerHTML = "";
+    
+    const closedLogs = logs.filter(l => l.status === "Closed");
+    if (closedLogs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center" class="text-muted">No completed maintenance history.</td></tr>`;
+      return;
+    }
+    
+    closedLogs.forEach(l => {
+      tbody.innerHTML += `
+        <tr>
+          <td><span class="fw-600">${l.vehicle_name}</span></td>
+          <td>${l.service_type}</td>
+          <td>${l.service_date}</td>
+          <td><span class="badge ${l.is_planned ? 'badge-blue' : 'badge-red'}">${l.is_planned ? 'Planned' : 'Unplanned'}</span></td>
+          <td><span class="fw-600">₹${l.cost.toLocaleString()}</span></td>
+        </tr>
+      `;
+    });
+  } catch(e) {}
+}
+
+async function renderFinanceReports(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">Reports & Export</h2>
+        <p class="page-header-sub">Export fleet statistics and financial spreadsheets</p>
+      </div>
+    </div>
+    
+    <div class="card" style="max-width: 500px; margin: 0 auto">
+      <div class="card-body" style="text-align:center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:64px; height:64px; color:var(--c-accent); margin:0 auto 20px; opacity:0.8">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <p class="mb-4">Export the comprehensive fleet performance report including costs, efficiency and ROI rankings.</p>
+        <div style="display:flex; gap:12px; justify-content:center">
+          <button id="btn-export-csv" class="btn btn-secondary">Export to CSV</button>
+          <button id="btn-export-pdf" class="btn btn-primary">Export to PDF</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const downloadExport = async (url, filename) => {
+    try {
+      showToast("Generating report, please wait...");
+      const res = await fetch(url, { headers: { "Authorization": `Bearer ${state.token}` } });
+      if (!res.ok) throw new Error("Failed to export report");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = window.URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast("Report downloaded successfully");
+    } catch(e) {
+      showToast(e.message, "error");
+    }
+  };
+
+  document.getElementById("btn-export-csv").addEventListener("click", () => downloadExport("/api/reports/export.csv", "transitops_report.csv"));
+  document.getElementById("btn-export-pdf").addEventListener("click", () => downloadExport("/api/reports/export.pdf", "transitops_report.pdf"));
+}
+
+// -------------------------------------------------------------
+// ADMIN PAGES (2)
+// -------------------------------------------------------------
+
+async function renderAdminOverview(host) {
+  host.innerHTML = `
+    <div id="metrics-strip"></div>
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-header"><span class="card-title">System Status Overview</span></div>
+        <div class="card-body">
+          <p class="text-sm">TransitOps Database is connected and seeding is active. Database records are stored in sqlite database. You can manage operational permissions, driver registration codes, and access audits.</p>
+          <div class="divider"></div>
+          <div style="display:flex; justify-content:space-between">
+            <div>
+              <div class="text-muted text-sm">Database Engine</div>
+              <div class="fw-600">SQLite</div>
+            </div>
+            <div>
+              <div class="text-muted text-sm">Backend Engine</div>
+              <div class="fw-600">FastAPI</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Quick Action Logs</span></div>
+        <div class="card-body" id="quick-action-logs">
+          <div class="alert alert-info">All systems operational. No warnings detected.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  renderOverviewStrip(document.getElementById("metrics-strip"));
+}
+
+async function renderAdminUsers(host) {
+  host.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2 class="page-header-title">System User Accounts</h2>
+        <p class="page-header-sub">Manage system roles, access flags, and create officers</p>
+      </div>
+      <button class="btn btn-primary" id="btn-create-user">Create User</button>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Full Name</th>
+              <th>Email Address</th>
+              <th>Assigned Role</th>
+              <th>System Status</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="5" style="text-align:center" class="text-muted">Loading account lists...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  async function loadUsers() {
+    try {
+      const users = await request("/api/auth/users");
+      const tbody = document.getElementById("users-tbody");
+      tbody.innerHTML = "";
+      
+      users.forEach(u => {
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="fw-600">USR-${u.id}</span></td>
+            <td>${u.name}</td>
+            <td>${u.email}</td>
+            <td><span class="badge badge-violet">${u.role}</span></td>
+            <td><span class="badge ${u.is_active ? 'badge-green' : 'badge-red'}">${u.is_active ? 'Active' : 'Disabled'}</span></td>
+          </tr>
+        `;
+      });
+    } catch(e) {}
+  }
+  
+  document.getElementById("btn-create-user").addEventListener("click", () => {
+    const bodyHtml = `
+      <form id="new-user-form">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input id="u-name" type="text" class="form-control" required placeholder="User name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input id="u-email" type="email" class="form-control" required placeholder="email@transitops.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input id="u-password" type="password" class="form-control" required placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select id="u-role" class="form-control" required>
+            <option value="Fleet Manager">Fleet Manager</option>
+            <option value="Safety Officer">Safety Officer</option>
+            <option value="Financial Analyst">Financial Analyst</option>
+            <option value="Admin">Admin</option>
+          </select>
+        </div>
+      </form>
+    `;
+    const footerHtml = `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-user">Save User</button>
+    `;
+    showModal("Create System User", bodyHtml, footerHtml);
+    
+    document.getElementById("btn-submit-user").addEventListener("click", async () => {
+      const body = {
+        name: document.getElementById("u-name").value,
+        email: document.getElementById("u-email").value,
+        password: document.getElementById("u-password").value,
+        role: document.getElementById("u-role").value
+      };
+      
+      await request("/api/auth/users", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      showToast("System user created successfully.");
+      closeModal();
+      loadUsers();
+    });
+  });
+  
+  loadUsers();
+}
+
+// -------------------------------------------------------------
+// APP STARTUP
+// -------------------------------------------------------------
+if (state.token) {
+  initApp();
+} else {
+  document.getElementById("app").classList.remove("visible");
+  document.getElementById("auth-screen").style.display = "flex";
+}

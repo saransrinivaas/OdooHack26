@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,7 +21,7 @@ def _out(db: Session, e: Expense) -> ExpenseOut:
 
 
 @router.get("", response_model=list[ExpenseOut])
-def list_expenses(vehicle_id: int | None = Query(None), category: str | None = Query(None),
+def list_expenses(vehicle_id: Optional[int] = Query(None), category: Optional[str] = Query(None),
                   db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     q = db.query(Expense)
     if vehicle_id:

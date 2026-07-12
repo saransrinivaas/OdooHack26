@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query
@@ -15,9 +16,9 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("/kpis")
 def kpis(
-    type: str | None = Query(None),
-    status: str | None = Query(None),
-    region: str | None = Query(None),
+    type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):

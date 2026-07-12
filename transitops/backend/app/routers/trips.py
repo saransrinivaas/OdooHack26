@@ -1,10 +1,11 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_roles
 from ..database import get_db
 from ..models import Trip, Vehicle, Driver, TripStatus, Role, User
-from ..schemas import TripCreate, TripComplete, TripOut, TripRevenue, TripSuggestRequest
+from ..schemas import TripCreate, TripComplete, TripOut, TripRevenue, TripSuggestRequest, TripUpdate
 from .. import business
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
@@ -28,8 +29,8 @@ def _out(db: Session, t: Trip) -> TripOut:
 
 @router.get("", response_model=list[TripOut])
 def list_trips(
-    status: str | None = Query(None),
-    search: str | None = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     sort: str = Query("-id"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -83,6 +84,59 @@ def create_trip(body: TripCreate, db: Session = Depends(get_db),
         status=TripStatus.DRAFT,
     )
     db.add(t)
+    db.commit()
+    db.refresh(t)
+    return _out(db, t)
+
+
+@router.put("/{trip_id}", response_model=TripOut)
+def update_trip(trip_id: int, body: TripUpdate, db: Session = Depends(get_db),
+                _: User = Depends(own_trips)):
+    """Edit/reassign driver and vehicle for an active/draft trip."""
+    t = db.query(Trip).get(trip_id)
+    if not t:
+        raise HTTPException(404, "Trip not found.")
+    if t.status in (TripStatus.COMPLETED, TripStatus.CANCELLED):
+        raise HTTPException(400, f"Cannot update a {t.status} trip.")
+
+    data = body.model_dump(exclude_unset=True)
+
+    # Check vehicle swap
+    if "vehicle_id" in data and data["vehicle_id"] != t.vehicle_id:
+        new_v = db.query(Vehicle).get(data["vehicle_id"])
+        if not new_v:
+            raise HTTPException(400, "New vehicle not found.")
+        old_v = db.query(Vehicle).get(t.vehicle_id)
+        
+        if t.status == TripStatus.DISPATCHED:
+            if new_v.status != VehicleStatus.AVAILABLE:
+                raise HTTPException(400, f"New vehicle {new_v.registration_number} is not Available.")
+            if old_v:
+                old_v.status = VehicleStatus.AVAILABLE
+            new_v.status = VehicleStatus.ON_TRIP
+            t.start_odometer = new_v.odometer
+        t.vehicle_id = new_v.id
+
+    # Check driver swap
+    if "driver_id" in data and data["driver_id"] != t.driver_id:
+        new_d = db.query(Driver).get(data["driver_id"])
+        if not new_d:
+            raise HTTPException(400, "New driver not found.")
+        old_d = db.query(Driver).get(t.driver_id)
+        
+        if t.status == TripStatus.DISPATCHED:
+            if new_d.status != DriverStatus.AVAILABLE or business.license_expired(new_d):
+                raise HTTPException(400, f"New driver {new_d.name} is not Available/Valid.")
+            if old_d:
+                old_d.status = DriverStatus.AVAILABLE
+            new_d.status = DriverStatus.ON_TRIP
+        t.driver_id = new_d.id
+
+    # Update other fields
+    for k in ("source", "destination", "cargo_weight", "planned_distance", "planned_duration", "revenue"):
+        if k in data:
+            setattr(t, k, data[k])
+
     db.commit()
     db.refresh(t)
     return _out(db, t)

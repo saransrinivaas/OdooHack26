@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api/drivers", tags=["drivers"])
 
 # Permission matrix: Safety Officer owns driver compliance (licence data,
 # suspend/reinstate, safety score). Fleet Manager sees the roster read-only.
-manage = require_roles(Role.SAFETY_OFFICER)
+manage = require_roles(Role.SAFETY_OFFICER, Role.FLEET_MANAGER)
 
 
 def _out(d: Driver) -> DriverOut:
@@ -24,8 +25,8 @@ def _out(d: Driver) -> DriverOut:
 
 @router.get("", response_model=list[DriverOut])
 def list_drivers(
-    status: str | None = Query(None),
-    search: str | None = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     sort: str = Query("name"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),

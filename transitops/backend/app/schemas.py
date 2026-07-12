@@ -37,6 +37,16 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
+class DriverSignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    license_number: str
+    license_category: str = ""
+    license_expiry: Optional[date] = None
+    contact_number: str = ""
+
+
 # --- Vehicle ---
 class VehicleBase(BaseModel):
     registration_number: str
@@ -108,6 +118,7 @@ class DriverUpdate(BaseModel):
 
 class DriverOut(DriverBase):
     id: int
+    user_id: Optional[int] = None
     license_expired: bool = False
 
     class Config:
@@ -124,6 +135,17 @@ class TripCreate(BaseModel):
     planned_distance: float = 0
     planned_duration: Optional[float] = None
     revenue: float = 0
+
+
+class TripUpdate(BaseModel):
+    source: Optional[str] = None
+    destination: Optional[str] = None
+    vehicle_id: Optional[int] = None
+    driver_id: Optional[int] = None
+    cargo_weight: Optional[float] = None
+    planned_distance: Optional[float] = None
+    planned_duration: Optional[float] = None
+    revenue: Optional[float] = None
 
 
 class TripComplete(BaseModel):

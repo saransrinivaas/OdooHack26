@@ -8,11 +8,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE/backend"
 PORT="${PORT:-8010}"
 
-echo "🚚 TransitOps — installing backend dependencies (first run only)…"
+echo "TransitOps — installing backend dependencies (first run only)…"
 python3 -m pip install -q -r requirements.txt
 
 echo ""
-echo "✅ Starting TransitOps on http://127.0.0.1:${PORT}"
+echo "Starting TransitOps on http://127.0.0.1:${PORT}"
 echo "   Open that URL in your browser. Demo logins (password: transitops123):"
 echo "     manager@transitops.com   (Fleet Manager)"
 echo "     driver@transitops.com    (Driver)"

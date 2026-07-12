@@ -1,3 +1,4 @@
+from typing import Optional
 """Vehicle / driver document management (bonus) with OCR-backed licence
 verification powered by your existing ocr_test.py."""
 import json
@@ -21,8 +22,11 @@ def _serialize(d: Document) -> dict:
     return {
         "id": d.id,
         "vehicle_id": d.vehicle_id,
+        "vehicle_name": d.vehicle.name if d.vehicle else None,
         "driver_id": d.driver_id,
         "doc_type": d.doc_type,
+        "document_number": d.document_number,
+        "expiry_date": d.expiry_date.isoformat() if d.expiry_date else None,
         "filename": d.filename,
         "ocr_verdict": d.ocr_verdict,
         "ocr_data": json.loads(d.ocr_data) if d.ocr_data else None,
@@ -31,7 +35,7 @@ def _serialize(d: Document) -> dict:
 
 
 @router.get("")
-def list_documents(vehicle_id: int | None = None, driver_id: int | None = None,
+def list_documents(vehicle_id: Optional[int] = None, driver_id: Optional[int] = None,
                    db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     q = db.query(Document)
     if vehicle_id:
@@ -59,8 +63,8 @@ def scan_licence(file: UploadFile = File(...), _: User = Depends(get_current_use
 def upload_document(
     file: UploadFile = File(...),
     doc_type: str = Form("Other"),
-    vehicle_id: int | None = Form(None),
-    driver_id: int | None = Form(None),
+    vehicle_id: Optional[int] = Form(None),
+    driver_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     _: User = Depends(manage),
 ):
