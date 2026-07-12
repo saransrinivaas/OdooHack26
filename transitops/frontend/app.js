@@ -233,6 +233,7 @@ DEMO_ACCS.forEach(acc => {
   btn.addEventListener("click", () => {
     document.getElementById("login-email").value = acc.email;
     document.getElementById("login-password").value = "transitops123";
+    document.getElementById("login-btn").click();
   });
   demoHost.appendChild(btn);
 });
