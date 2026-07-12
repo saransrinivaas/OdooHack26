@@ -60,7 +60,7 @@ def seed():
                     odometer=14200, acquisition_cost=650000,
                     acquisition_date=_today()-timedelta(days=500),
                     service_interval_km=10000, last_service_odometer=10000,
-                    status=VehicleStatus.AVAILABLE),
+                    status=VehicleStatus.ON_TRIP),
             Vehicle(registration_number="MH12CD5678", name="Ashok Leyland 1918",
                     type="Truck", region="North", max_load_capacity=9000,
                     odometer=91000, acquisition_cost=2800000,
@@ -72,7 +72,7 @@ def seed():
                     odometer=43500, acquisition_cost=850000,
                     acquisition_date=_today()-timedelta(days=800),
                     service_interval_km=10000, last_service_odometer=40000,
-                    status=VehicleStatus.AVAILABLE),
+                    status=VehicleStatus.ON_TRIP),
             Vehicle(registration_number="DL08GH3456", name="Mahindra Supro",
                     type="Van",   region="West",  max_load_capacity=600,
                     odometer=55000, acquisition_cost=720000,
@@ -189,6 +189,8 @@ def seed():
 
             # Dispatched (currently active)
             make_trip("Delhi",  "Lucknow",  "RJ14KL2345", "Dan Driver", 900, 560, 8.5, 32000, TripStatus.DISPATCHED, days_ago=0),
+            make_trip("Mumbai", "Pune",     "TN01AB1234", "Dan Driver", 300, 160, 3.0, 18000, TripStatus.DISPATCHED, days_ago=0),
+            make_trip("Bangalore", "Chennai", "KA05EF9012", "Dan Driver", 250, 350, 6.0, 25000, TripStatus.DISPATCHED, days_ago=0),
 
             # Drafts (pending)
             make_trip("Chennai", "Bangalore", "MH12CD5678", "Dan Driver",   5500, 350, 6.0, 40000, TripStatus.DRAFT),
