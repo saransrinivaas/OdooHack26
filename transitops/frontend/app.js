@@ -1558,6 +1558,8 @@ async function renderDriverTrips(host) {
       </div>
     </div>
     
+    <div id="driver-stats-section" style="margin-bottom: 24px;"></div>
+    
     <div id="driver-active-trip-section" class="mb-4"></div>
     
     <div class="card">
@@ -1588,12 +1590,46 @@ async function renderDriverTrips(host) {
   try {
     const trips = await request("/api/trips");
     const activeSection = document.getElementById("driver-active-trip-section");
+    const statsSection = document.getElementById("driver-stats-section");
     const tbody = document.getElementById("driver-trips-tbody");
     tbody.innerHTML = "";
     
     const drivers = await request("/api/drivers");
     const meDriver = drivers.find(d => d.email === state.email);
     const myDriverId = meDriver ? meDriver.id : -1;
+    
+    // Render Stats Row
+    let starsHTML = "N/A";
+    let expiryHTML = "N/A";
+    
+    if (meDriver) {
+      try {
+        const ratings = await request("/api/ratings/drivers");
+        const myRating = ratings.find(r => r.driver_id === myDriverId);
+        if (myRating) {
+          starsHTML = renderStars(myRating.stars, myRating.band);
+        }
+      } catch (err) {}
+      
+      if (meDriver.license_expiry) {
+        const days = Math.ceil((new Date(meDriver.license_expiry) - new Date()) / (1000 * 60 * 60 * 24));
+        const color = days < 30 ? "var(--c-red)" : days < 90 ? "var(--c-amber)" : "var(--c-green)";
+        expiryHTML = `<span style="color:${color}; font-weight:600">${meDriver.license_expiry} (${days} days left)</span>`;
+      }
+    }
+    
+    statsSection.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+        <div class="card" style="padding:16px; display:flex; flex-direction:column; gap:4px">
+          <span class="text-muted text-sm fw-600">My Safety Rating</span>
+          <span style="font-size:1.1rem; font-weight:700; display:flex; align-items:center">${starsHTML}</span>
+        </div>
+        <div class="card" style="padding:16px; display:flex; flex-direction:column; gap:4px">
+          <span class="text-muted text-sm fw-600">License Expiry</span>
+          <span style="font-size:1.1rem; font-weight:700; margin-top:4px">${expiryHTML}</span>
+        </div>
+      </div>
+    `;
     
     // Filter trips for this driver
     const driverTrips = trips.filter(t => t.driver_id === myDriverId);
